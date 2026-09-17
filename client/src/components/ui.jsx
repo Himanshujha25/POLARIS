@@ -1,6 +1,6 @@
 export function Card({ children, className = '' }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#111a2e] ${className}`}>
+    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow duration-200 hover:shadow-md dark:border-slate-800 dark:bg-[#111a2e] ${className}`}>
       {children}
     </div>
   );
@@ -96,13 +96,13 @@ export const inputCls =
   'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-white';
 
 export const btnPrimary =
-  'rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50';
+  'rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-shadow duration-200 hover:bg-cyan-500 hover:shadow-sm disabled:opacity-50';
 
 export const btnGhost =
-  'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
+  'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-shadow duration-200 hover:bg-slate-50 hover:shadow-sm dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
 
 export const btnDanger =
-  'rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50';
+  'rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-shadow duration-200 hover:bg-red-500 hover:shadow-sm disabled:opacity-50';
 
 export function ErrorNote({ message }) {
   if (!message) return null;
