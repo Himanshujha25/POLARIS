@@ -21,7 +21,7 @@ Phase 6: Simulation Harness, Edge Cases, Hardening & Final SIH Polish
 ## 2. Phase Breakdown
 
 ### Phase 1: Backend Scaffolding & Data Modeling
-- Initialize Node.js/Express environment in `backend/`.
+- Initialize Node.js/Express environment in `server/`.
 - Setup Mongoose database connection with strict schema validations.
 - Build models: `User`, `Expedition`, `Personnel`, `Cargo`, `Inventory`, `Asset`, `Alert`, `GeoTrack`.
 - Seed comprehensive realistic polar datasets (Bharati & Maitri stations, 44-IAE expedition, snow vehicles, fuel reserves, field scientists).

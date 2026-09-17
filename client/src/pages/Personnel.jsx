@@ -1,0 +1,198 @@
+import { useEffect, useState } from 'react';
+import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost } from '../components/ui';
+
+const LOCATIONS = ['NCPOR Goa', 'Mumbai Port', 'Cape Town Hub', 'Research Vessel', 'Ice Shelf', 'Bharati Station', 'Maitri Station', 'Himadri Station', 'Field Camp A', 'Field Camp B'];
+const STATUSES = ['StationHab', 'FieldResearch', 'InTransit', 'MedicalQuarantine', 'SOS_Alert'];
+
+export default function Personnel() {
+  const { user } = useAuth();
+  const [list, setList] = useState([]);
+  const [exps, setExps] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [movements, setMovements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [checkId, setCheckId] = useState(null);
+  const [checkForm, setCheckForm] = useState({ status: 'StationHab', location: '', lat: '', lng: '' });
+  const [showDeploy, setShowDeploy] = useState(false);
+  const [depForm, setDepForm] = useState({ expeditionId: '', userId: '', badgeId: '', roleTitle: '', currentLocation: 'Maitri Station' });
+
+  const canDeploy = ['SuperAdmin', 'ExpeditionManager', 'PersonnelOfficer'].includes(user?.role);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [p, e, m] = await Promise.all([
+        api('/api/v1/personnel'),
+        api('/api/v1/expeditions'),
+        api('/api/v1/personnel/movements')
+      ]);
+      setList(p); setExps(e); setMovements(m);
+      if (!depForm.expeditionId && e[0]) setDepForm(f => ({ ...f, expeditionId: e[0]._id }));
+      try { setUsers(await api('/api/v1/auth/users')); } catch { /* non-admin can't list */ }
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  // Group by location: kitne / kahan / kaun
+  const groups = {};
+  list.forEach(p => {
+    const loc = p.currentLocation || p.assignedFieldZone || 'Unknown';
+    (groups[loc] = groups[loc] || []).push(p);
+  });
+
+  const openCheckin = (p) => {
+    setCheckId(p._id);
+    setCheckForm({ status: p.currentStatus, location: p.currentLocation || '', lat: '', lng: '' });
+  };
+
+  const doCheckin = async (e) => {
+    e.preventDefault();
+    const p = list.find(x => x._id === checkId);
+    await api('/api/v1/personnel/checkin', {
+      method: 'POST',
+      body: {
+        badgeId: p.badgeId,
+        status: checkForm.status,
+        location: checkForm.location,
+        ...(checkForm.lat && checkForm.lng ? { lat: Number(checkForm.lat), lng: Number(checkForm.lng) } : {})
+      }
+    });
+    setCheckId(null); load();
+  };
+
+  const deploy = async (e) => {
+    e.preventDefault();
+    await api('/api/v1/personnel', {
+      method: 'POST',
+      body: { ...depForm, currentStatus: 'StationHab', lastCheckIn: new Date().toISOString() }
+    });
+    setShowDeploy(false);
+    setDepForm({ expeditionId: exps[0]?._id || '', userId: '', badgeId: '', roleTitle: '', currentLocation: 'Maitri Station' });
+    load();
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-extrabold sm:text-2xl">Personnel Movement</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{list.length} deployed · check-in from ship, station or field</p>
+        </div>
+        {canDeploy && <button className={btnPrimary} onClick={() => setShowDeploy(true)}>+ Deploy member</button>}
+      </div>
+
+      {/* Deployment view: kitne / kahan / kaun */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {Object.entries(groups).map(([loc, members]) => (
+          <Card key={loc} className="p-3">
+            <div className="flex items-center justify-between">
+              <p className="font-bold">📍 {loc}</p>
+              <span className="rounded-full bg-cyan-600/10 px-2 py-0.5 text-xs font-bold text-cyan-600 dark:text-cyan-300">{members.length}</span>
+            </div>
+            <ul className="mt-1 text-sm">
+              {members.map(m => (
+                <li key={m._id} className="flex items-center justify-between py-0.5">
+                  <span>{m.badgeId} · {m.userId?.fullName || m.userId?.username}</span>
+                  <Pill value={m.currentStatus} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ))}
+      </div>
+      {list.length === 0 && <Empty text="No personnel deployed yet — use Deploy member" />}
+
+      {/* Movement history timeline */}
+      <Card className="p-4">
+        <h2 className="mb-2 font-bold">Movement history ({movements.length})</h2>
+        {movements.length === 0 ? <p className="text-sm text-slate-500">No movements recorded yet</p> : (
+          <div className="flex max-h-64 flex-col gap-2 overflow-y-auto border-l-2 border-cyan-500/40 pl-3">
+            {movements.slice(0, 30).map(m => (
+              <div key={m._id} className="text-sm">
+                <p><b>{m.personnelId?.badgeId}</b>: {m.fromLocation || '—'} → <b>{m.toLocation}</b></p>
+                <p className="text-xs text-slate-500">{new Date(m.createdAt).toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Roster */}
+      <Card className="p-0">
+        <TableWrap>
+          <table className="w-full">
+            <thead><tr><Th>Badge</Th><Th>Name</Th><Th>Status</Th><Th>Location</Th><Th>Last check-in</Th><Th>Action</Th></tr></thead>
+            <tbody>
+              {list.map(p => (
+                <tr key={p._id} className="border-t border-slate-100 dark:border-slate-800">
+                  <Td>{p.badgeId}</Td>
+                  <Td>{p.userId?.fullName || p.userId?.username}</Td>
+                  <Td><Pill value={p.currentStatus} /></Td>
+                  <Td>{p.currentLocation || '—'}</Td>
+                  <Td>{p.lastCheckIn ? new Date(p.lastCheckIn).toLocaleString() : '—'}</Td>
+                  <Td><button onClick={() => openCheckin(p)} className={btnGhost + ' !px-2 !py-1 text-xs'}>Check-in</button></Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableWrap>
+      </Card>
+
+      {checkId && (
+        <Modal title="Check-in — kahan se?" onClose={() => setCheckId(null)}>
+          <form onSubmit={doCheckin} className="flex flex-col gap-3">
+            <Field label="Status">
+              <select className={inputCls} value={checkForm.status} onChange={e => setCheckForm({ ...checkForm, status: e.target.value })}>
+                {STATUSES.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Current location (ship / station / field)">
+              <select className={inputCls} value={checkForm.location} onChange={e => setCheckForm({ ...checkForm, location: e.target.value })}>
+                <option value="">— select —</option>
+                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+              </select>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Lat (optional)"><input className={inputCls} value={checkForm.lat} onChange={e => setCheckForm({ ...checkForm, lat: e.target.value })} placeholder="-70.77" /></Field>
+              <Field label="Lng (optional)"><input className={inputCls} value={checkForm.lng} onChange={e => setCheckForm({ ...checkForm, lng: e.target.value })} placeholder="11.73" /></Field>
+            </div>
+            <button className={btnPrimary}>Check-in now</button>
+          </form>
+        </Modal>
+      )}
+
+      {showDeploy && (
+        <Modal title="Deploy member to expedition" onClose={() => setShowDeploy(false)}>
+          <form onSubmit={deploy} className="flex flex-col gap-3">
+            <Field label="Expedition">
+              <select className={inputCls} value={depForm.expeditionId} onChange={e => setDepForm({ ...depForm, expeditionId: e.target.value })}>
+                {exps.map(x => <option key={x._id} value={x._id}>{x.expeditionCode} — {x.title}</option>)}
+              </select>
+            </Field>
+            <Field label="User">
+              <select className={inputCls} required value={depForm.userId} onChange={e => setDepForm({ ...depForm, userId: e.target.value })}>
+                <option value="">— select user —</option>
+                {users.map(u => <option key={u._id} value={u._id}>{u.fullName} ({u.role})</option>)}
+              </select>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Badge ID"><input className={inputCls} required value={depForm.badgeId} onChange={e => setDepForm({ ...depForm, badgeId: e.target.value })} placeholder="POL-007" /></Field>
+              <Field label="Role title"><input className={inputCls} value={depForm.roleTitle} onChange={e => setDepForm({ ...depForm, roleTitle: e.target.value })} placeholder="Glaciologist" /></Field>
+            </div>
+            <Field label="Starting location">
+              <select className={inputCls} value={depForm.currentLocation} onChange={e => setDepForm({ ...depForm, currentLocation: e.target.value })}>
+                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+              </select>
+            </Field>
+            <button className={btnPrimary}>Deploy</button>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}

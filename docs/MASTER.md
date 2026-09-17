@@ -180,7 +180,7 @@ Hardware, satellite, drone, robot, weather AI, ML compulsory nahi. Language pres
 
 - `docs/01-05` — detailed specs (done)
 - `client/` — Vite+React19 scaffold only, Tailwind/Router/Leaflet/Socket abhi add karna hai
-- `server/` — abhi banana hai
+- `server/` — built + verified (29/29 smoke tests pass). Run: `cd server; if ($?) { npm install }; if ($?) { npm start }` (:5000, admin / Test@123)
 - Root `package.json` — placeholder
 
-**Next:** P1 start — backend scaffold + models + seed.
+**Next:** Client — Tactical Command Dashboard.
