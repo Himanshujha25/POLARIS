@@ -72,8 +72,10 @@ router.get('/readiness/:expeditionId', async (req, res) => {
   const cargoPct = reqTotal ? Math.round((reqReceived / reqTotal) * 100) : (cargos.length ? 50 : 0);
   const healthyInv = inventory.filter(i => i.status === 'Optimal').length;
   const inventoryPct = inventory.length ? Math.round((healthyInv / inventory.length) * 100) : 0;
-  const opAssets = assets.filter(a => a.condition === 'Operational').length;
-  const assetPct = assets.length ? Math.round((opAssets / assets.length) * 100) : 0;
+  const expAssets = assets.filter(a => a.expeditionId && a.expeditionId.toString() === expeditionId);
+  const targetAssets = expAssets.length > 0 ? expAssets : assets;
+  const opAssets = targetAssets.filter(a => a.condition === 'Operational').length;
+  const assetPct = targetAssets.length ? Math.round((opAssets / targetAssets.length) * 100) : 0;
   const overall = Math.round((personnelPct + cargoPct + inventoryPct + assetPct) / 4);
 
   res.json({
@@ -81,6 +83,7 @@ router.get('/readiness/:expeditionId', async (req, res) => {
     counts: {
       personnel: personnel.length, quota: exp?.totalPersonnelQuota || 0,
       requirements: reqs.length, cargos: cargos.length,
+      assets: expAssets.length,
       openIncidents: incidents.length
     },
     issues: incidents.map(i => ({ code: i.incidentCode, type: i.type, severity: i.severity, status: i.status }))

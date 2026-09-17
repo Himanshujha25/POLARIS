@@ -17,6 +17,7 @@ const assetSchema = new mongoose.Schema({
   operatingHours: { type: Number, default: 0 },
   maxHoursBeforeService: { type: Number, default: 500 },
   assignedToPersonnelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Personnel' },
+  expeditionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Expedition', index: true },
   lastServicedDate: Date,
   telemetry: { engineTempC: Number, vibrationLevel: Number, fuelLevelPercent: Number, oilPressurePsi: Number }
 }, { timestamps: true });

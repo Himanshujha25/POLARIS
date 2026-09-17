@@ -83,20 +83,29 @@ export default function Expeditions() {
       {list.length === 0 && <Empty text="No expeditions yet" />}
       <div className="grid gap-3 sm:grid-cols-2">
         {list.map(e => (
-          <Card key={e._id} className="p-4">
+          <Card key={e._id} className="p-5 border-l-4 border-l-cyan-500 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between gap-2">
-              <p className="font-bold">{e.expeditionCode}</p>
+              <span className="rounded bg-cyan-500/10 px-2 py-0.5 font-mono text-xs font-black text-cyan-600 dark:text-cyan-400">
+                {e.expeditionCode}
+              </span>
               <Pill value={e.status} />
             </div>
-            <p className="mt-1 text-sm">{e.title}</p>
-            <p className="text-xs text-slate-500">→ {e.targetStation} · quota {e.totalPersonnelQuota} · {e.cargoCapacityKg}kg</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link to={`/expeditions/${e._id}`} className={btnGhost + ' !px-3 !py-1 text-xs'}>Open dossier</Link>
+            <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white">{e.title}</h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              🎯 {e.targetStation} · ❄️ {e.season} · 👥 Quota: {e.totalPersonnelQuota || 35} crew
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+              <Link
+                to={`/expeditions/${e._id}`}
+                className={`${btnPrimary} !px-3 !py-1.5 text-xs flex items-center gap-1.5`}
+              >
+                Enter Mission Workspace →
+              </Link>
               {canEdit && (
-                <>
-                  <button onClick={() => openEdit(e)} className={btnGhost + ' !px-3 !py-1 text-xs'}>Edit</button>
-                  <button onClick={() => { setDeleting(e._id); setError(''); }} className={btnGhost + ' !px-3 !py-1 text-xs text-red-500'}>Delete</button>
-                </>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => openEdit(e)} className={`${btnGhost} !px-2.5 !py-1 text-xs`}>Edit</button>
+                  <button onClick={() => { setDeleting(e._id); setError(''); }} className={`${btnGhost} !px-2.5 !py-1 text-xs text-red-500 hover:text-red-600`}>Delete</button>
+                </div>
               )}
             </div>
           </Card>

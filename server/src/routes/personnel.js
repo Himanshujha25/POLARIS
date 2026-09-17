@@ -124,6 +124,9 @@ router.patch('/:id', async (req, res) => {
   ['roleTitle', 'assignedFieldZone', 'currentStatus', 'currentLocation', 'expectedReturn'].forEach(f => {
     if (req.body[f] !== undefined) p[f] = req.body[f];
   });
+  if (req.body.vitals) {
+    p.vitals = { ...(p.vitals?.toObject?.() || {}), ...req.body.vitals };
+  }
   await p.save();
   logAudit(req, 'update', 'Personnel', p._id, { details: 'roster edited' });
   res.json(p);

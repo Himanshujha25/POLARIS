@@ -21,7 +21,9 @@ The **National Centre for Polar and Ocean Research (NCPOR)** conducts annual sci
                                   │
     ┌─────────────┬───────────────┼───────────────┬─────────────┐
     ▼             ▼               ▼               ▼             ▼
-1. Expedition  2. Personnel    3. Cargo &      4. Polar Station  5. Emergency
+1. Expedition  2. Personnel    3. Cargo &      4. Polar Station  5. 
+
+Emergency
    Planning       Movement        Multimodal      Inventory &       & SOS
    & Rosters      & Safety        Tracking        Life Support      Response
                                        │

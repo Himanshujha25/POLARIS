@@ -2,6 +2,7 @@ const express = require('express');
 const Expedition = require('../models/Expedition');
 const Personnel = require('../models/Personnel');
 const Cargo = require('../models/Cargo');
+const Asset = require('../models/Asset');
 const Requirement = require('../models/Requirement');
 const { authRequired, requireRoles } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
@@ -26,15 +27,17 @@ router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, re
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// GET /api/v1/expeditions/:id — dossier
+// GET /api/v1/expeditions/:id — comprehensive mission dossier
 router.get('/:id', async (req, res) => {
-  const exp = await Expedition.findById(req.params.id).populate('leaderId', 'username fullName role');
+  const exp = await Expedition.findById(req.params.id).populate('leaderId', 'username fullName role email');
   if (!exp) return res.status(404).json({ error: 'Not found' });
-  const [personnel, cargo] = await Promise.all([
-    Personnel.find({ expeditionId: exp._id }).populate('userId', 'username fullName role'),
-    Cargo.find({ expeditionId: exp._id })
+  const [personnel, cargo, assets, requirements] = await Promise.all([
+    Personnel.find({ expeditionId: exp._id }).populate('userId', 'username fullName role email bloodGroup emergencyContact'),
+    Cargo.find({ expeditionId: exp._id }),
+    Asset.find({ expeditionId: exp._id }).populate('assignedToPersonnelId', 'badgeId roleTitle'),
+    Requirement.find({ expeditionId: exp._id })
   ]);
-  res.json({ expedition: exp, personnel, cargo });
+  res.json({ expedition: exp, personnel, cargo, assets, requirements });
 });
 
 // PATCH /api/v1/expeditions/:id
