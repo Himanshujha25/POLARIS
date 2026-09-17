@@ -2,7 +2,9 @@ const express = require('express');
 const Expedition = require('../models/Expedition');
 const Personnel = require('../models/Personnel');
 const Cargo = require('../models/Cargo');
+const Requirement = require('../models/Requirement');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
 router.use(authRequired);
@@ -19,6 +21,7 @@ router.get('/', async (req, res) => {
 router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
   try {
     const exp = await Expedition.create(req.body);
+    logAudit(req, 'create', 'Expedition', exp._id, { to: exp.expeditionCode });
     res.status(201).json(exp);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -38,7 +41,25 @@ router.get('/:id', async (req, res) => {
 router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
   const exp = await Expedition.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
   if (!exp) return res.status(404).json({ error: 'Not found' });
+  logAudit(req, 'update', 'Expedition', exp._id, { details: 'expedition updated' });
   res.json(exp);
+});
+
+// DELETE /api/v1/expeditions/:id — blocked when operational records exist
+router.delete('/:id', requireRoles('SuperAdmin'), async (req, res) => {
+  const exp = await Expedition.findById(req.params.id);
+  if (!exp) return res.status(404).json({ error: 'Not found' });
+  const [p, c, r] = await Promise.all([
+    Personnel.countDocuments({ expeditionId: exp._id }),
+    Cargo.countDocuments({ expeditionId: exp._id }),
+    Requirement.countDocuments({ expeditionId: exp._id })
+  ]);
+  if (p + c + r > 0) {
+    return res.status(400).json({ error: `Cannot delete: ${p} personnel, ${c} cargo, ${r} requirements linked. Complete/Cancel instead.` });
+  }
+  await exp.deleteOne();
+  logAudit(req, 'delete', 'Expedition', exp._id, { from: exp.expeditionCode });
+  res.json({ deleted: true });
 });
 
 module.exports = router;

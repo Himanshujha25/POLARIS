@@ -49,6 +49,31 @@ router.post('/', requireRoles(...CAN_WRITE), async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// PATCH /api/v1/inventory/:id — edit thresholds, rates, bunker
+router.patch('/:id', requireRoles(...CAN_WRITE), async (req, res) => {
+  const item = await Inventory.findById(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  ['itemName', 'minimumSafeThreshold', 'criticalEmergencyThreshold', 'dailyConsumptionRate', 'storageBunker', 'expiryDate', 'unit', 'category'].forEach(f => {
+    if (req.body[f] !== undefined) item[f] = req.body[f];
+  });
+  item.recalc();
+  await item.save();
+  await recordTxn(item, 'ADJUSTMENT', 0, req, { opening: item.currentStock, reason: 'Master data edited' });
+  logAudit(req, 'update', 'Inventory', item._id, { details: 'item edited' });
+  res.json(item);
+});
+
+// DELETE /api/v1/inventory/:id — blocked when traceable transactions exist
+router.delete('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
+  const item = await Inventory.findById(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  const n = await InventoryTransaction.countDocuments({ inventoryId: item._id });
+  if (n > 0) return res.status(400).json({ error: `Cannot delete: ${n} transactions reference this stock. Set stock to 0 instead.` });
+  await item.deleteOne();
+  logAudit(req, 'delete', 'Inventory', item._id, { from: `${item.itemName}@${item.station}` });
+  res.json({ deleted: true });
+});
+
 // PATCH /api/v1/inventory/:id/consume — every change creates a transaction (#13)
 router.patch('/:id/consume', requireRoles(...CAN_WRITE), async (req, res) => {
   const item = await Inventory.findById(req.params.id);

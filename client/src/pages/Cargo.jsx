@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { api } from '../lib/api';
+import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost } from '../components/ui';
+import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
 
 const NODES = ['NCPOR_Goa', 'Mumbai_Port', 'Cape_Town_Hub', 'Research_Vessel', 'Ice_Shelf_Barrier', 'Bharati_Station', 'Maitri_Station'];
 
@@ -20,6 +21,11 @@ export default function Cargo() {
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [receiveCargo, setReceiveCargo] = useState(null);
   const [receiveStation, setReceiveStation] = useState('Maitri');
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({ title: '', weightKg: '', eta: '' });
+  const [deleting, setDeleting] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const canEdit = ['SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'].includes(user?.role);
 
@@ -36,11 +42,42 @@ export default function Cargo() {
     setLoading(false);
   };
   useEffect(() => { load(); }, [statusF]);
+  useLiveRefresh(load);
 
   const create = async (e) => {
     e.preventDefault();
-    await api('/api/v1/cargo', { method: 'POST', body: { ...form, weightKg: Number(form.weightKg) } });
-    setShowCreate(false); load();
+    setError('');
+    try {
+      await api('/api/v1/cargo', { method: 'POST', body: { ...form, weightKg: Number(form.weightKg) } });
+      setShowCreate(false); load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const openEdit = (c) => {
+    setEditing(c._id);
+    setEditForm({ title: c.title, weightKg: c.weightKg || '', eta: c.eta ? c.eta.slice(0, 10) : '' });
+    setError('');
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await api(`/api/v1/cargo/${editing}`, {
+        method: 'PATCH',
+        body: { title: editForm.title, weightKg: Number(editForm.weightKg) || 0, eta: editForm.eta || undefined }
+      });
+      setEditing(null); load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const doDelete = async () => {
+    setBusy(true); setError('');
+    try {
+      await api(`/api/v1/cargo/${deleting}`, { method: 'DELETE' });
+      setDeleting(null); load();
+    } catch (err) { setError(err.message); }
+    setBusy(false);
   };
 
   const advance = async (c) => {
@@ -125,6 +162,12 @@ export default function Cargo() {
               {canEdit && (c.currentNode === 'Bharati_Station' || c.currentNode === 'Maitri_Station') && c.status !== 'DeliveredStation' && (
                 <button onClick={() => openReceive(c)} className={btnPrimary + ' !px-3 !py-1 text-xs'}>Receive at station</button>
               )}
+              {canEdit && (
+                <>
+                  <button onClick={() => openEdit(c)} className={btnGhost + ' !px-3 !py-1 text-xs'}>Edit</button>
+                  <button onClick={() => { setDeleting(c._id); setError(''); }} className={btnGhost + ' !px-3 !py-1 text-xs text-red-500'}>Delete</button>
+                </>
+              )}
             </div>
           </Card>
         ))}
@@ -148,6 +191,30 @@ export default function Cargo() {
             <button className={btnPrimary}>Register</button>
           </form>
         </Modal>
+      )}
+
+      {editing && (
+        <Modal title="Edit cargo" onClose={() => setEditing(null)}>
+          <form onSubmit={saveEdit} className="flex flex-col gap-3">
+            <Field label="Title"><input className={inputCls} required value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Weight (kg)"><input type="number" className={inputCls} value={editForm.weightKg} onChange={e => setEditForm({ ...editForm, weightKg: e.target.value })} /></Field>
+              <Field label="ETA"><input type="date" className={inputCls} value={editForm.eta} onChange={e => setEditForm({ ...editForm, eta: e.target.value })} /></Field>
+            </div>
+            <ErrorNote message={error} />
+            <button className={btnPrimary}>Save changes</button>
+          </form>
+        </Modal>
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete cargo?"
+          message="The shipment and its tracking timeline will be removed. Recorded in audit log."
+          busy={busy}
+          onCancel={() => setDeleting(null)}
+          onConfirm={doDelete}
+        />
       )}
 
       {timeline && (

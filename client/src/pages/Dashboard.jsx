@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Rocket, Users, Siren, Boxes, Package, Clock, Wrench, Flame } from 'lucide-react';
 import { api } from '../lib/api';
+import { useLiveRefresh } from '../lib/useLive';
 import { Card, StatCard, Pill, Spinner, btnGhost } from '../components/ui';
 
 // PRD #7: operational KPIs from real records — no hardcoded numbers
@@ -9,23 +10,24 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [exps, personnel, alerts, forecast, cargo, assets, incidents] = await Promise.all([
-          api('/api/v1/expeditions'),
-          api('/api/v1/personnel'),
-          api('/api/v1/alerts/active'),
-          api('/api/v1/inventory/forecast'),
-          api('/api/v1/cargo'),
-          api('/api/v1/assets'),
-          api('/api/v1/incidents?active=true')
-        ]);
-        setData({ exps, personnel, alerts, forecast, cargo, assets, incidents });
-      } catch { /* show empty */ }
-      setLoading(false);
-    })();
-  }, []);
+  const load = async () => {
+    try {
+      const [exps, personnel, alerts, forecast, cargo, assets, incidents] = await Promise.all([
+        api('/api/v1/expeditions'),
+        api('/api/v1/personnel'),
+        api('/api/v1/alerts/active'),
+        api('/api/v1/inventory/forecast'),
+        api('/api/v1/cargo'),
+        api('/api/v1/assets'),
+        api('/api/v1/incidents?active=true')
+      ]);
+      setData({ exps, personnel, alerts, forecast, cargo, assets, incidents });
+    } catch { /* show empty */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+  useLiveRefresh(load);
 
   if (loading) return <Spinner />;
   const { exps = [], personnel = [], alerts = [], forecast = [], cargo = [], assets = [], incidents = [] } = data || {};

@@ -20,6 +20,7 @@ import IncidentDetail from './pages/IncidentDetail';
 import Reports from './pages/Reports';
 import Analytics from './pages/Analytics';
 import AuditLogs from './pages/AuditLogs';
+import Settings from './pages/Settings';
 import { Spinner } from './components/ui';
 
 function Protected({ children, roles }) {
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/reports" element={<Protected><Reports /></Protected>} />
             <Route path="/analytics" element={<Protected roles={[SA, EM]}><Analytics /></Protected>} />
             <Route path="/audit" element={<Protected roles={[SA, EM]}><AuditLogs /></Protected>} />
+            <Route path="/settings" element={<Protected roles={[SA]}><Settings /></Protected>} />
             <Route path="/users" element={<Protected roles={[SA]}><Users /></Protected>} />
           </Routes>
         </BrowserRouter>

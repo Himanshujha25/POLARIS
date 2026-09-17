@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost } from '../components/ui';
+import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV } from '../components/ui';
 
-const LOCATIONS = ['NCPOR Goa', 'Mumbai Port', 'Cape Town Hub', 'Research Vessel', 'Ice Shelf', 'Bharati Station', 'Maitri Station', 'Himadri Station', 'Field Camp A', 'Field Camp B'];
-const STATUSES = ['StationHab', 'FieldResearch', 'InTransit', 'MedicalQuarantine', 'SOS_Alert'];
+const FALLBACK_LOCATIONS = ['NCPOR Goa', 'Mumbai Port', 'Cape Town Hub', 'Research Vessel', 'Ice Shelf', 'Bharati Station', 'Maitri Station', 'Himadri Station', 'Field Camp A', 'Field Camp B'];
+const STATUSES = ['StationHab', 'FieldResearch', 'InTransit', 'MedicalQuarantine', 'SOS_Alert', 'Returned'];
 
 export default function Personnel() {
   const { user } = useAuth();
@@ -12,29 +13,38 @@ export default function Personnel() {
   const [exps, setExps] = useState([]);
   const [users, setUsers] = useState([]);
   const [movements, setMovements] = useState([]);
+  const [locOptions, setLocOptions] = useState(FALLBACK_LOCATIONS);
   const [loading, setLoading] = useState(true);
   const [checkId, setCheckId] = useState(null);
   const [checkForm, setCheckForm] = useState({ status: 'StationHab', location: '', lat: '', lng: '' });
   const [showDeploy, setShowDeploy] = useState(false);
   const [depForm, setDepForm] = useState({ expeditionId: '', userId: '', badgeId: '', roleTitle: '', currentLocation: 'Maitri Station' });
+  const [error, setError] = useState('');
+  const [editingRoster, setEditingRoster] = useState(null);
+  const [rosterForm, setRosterForm] = useState({ roleTitle: '', assignedFieldZone: '', currentStatus: 'StationHab' });
+  const [deletingRoster, setDeletingRoster] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const canDeploy = ['SuperAdmin', 'ExpeditionManager', 'PersonnelOfficer'].includes(user?.role);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [p, e, m] = await Promise.all([
+      const [p, e, m, locs] = await Promise.all([
         api('/api/v1/personnel'),
         api('/api/v1/expeditions'),
-        api('/api/v1/personnel/movements')
+        api('/api/v1/personnel/movements'),
+        api('/api/v1/locations').catch(() => [])
       ]);
       setList(p); setExps(e); setMovements(m);
+      if (Array.isArray(locs) && locs.length > 0) setLocOptions(locs.map(l => l.name));
       if (!depForm.expeditionId && e[0]) setDepForm(f => ({ ...f, expeditionId: e[0]._id }));
       try { setUsers(await api('/api/v1/auth/users')); } catch { /* non-admin can't list */ }
     } catch { /* ignore */ }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+  useLiveRefresh(load);
 
   // Group by location: kitne / kahan / kaun
   const groups = {};
@@ -65,13 +75,47 @@ export default function Personnel() {
 
   const deploy = async (e) => {
     e.preventDefault();
-    await api('/api/v1/personnel', {
-      method: 'POST',
-      body: { ...depForm, currentStatus: 'StationHab', lastCheckIn: new Date().toISOString() }
-    });
-    setShowDeploy(false);
-    setDepForm({ expeditionId: exps[0]?._id || '', userId: '', badgeId: '', roleTitle: '', currentLocation: 'Maitri Station' });
-    load();
+    setError('');
+    try {
+      await api('/api/v1/personnel', {
+        method: 'POST',
+        body: { ...depForm, currentStatus: 'StationHab', lastCheckIn: new Date().toISOString() }
+      });
+      setShowDeploy(false);
+      setDepForm({ expeditionId: exps[0]?._id || '', userId: '', badgeId: '', roleTitle: '', currentLocation: locOptions[0] || 'Maitri Station' });
+      load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const openRosterEdit = (p) => {
+    setEditingRoster(p._id);
+    setRosterForm({ roleTitle: p.roleTitle || '', assignedFieldZone: p.assignedFieldZone || '', currentStatus: p.currentStatus });
+    setError('');
+  };
+
+  const saveRosterEdit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await api(`/api/v1/personnel/${editingRoster}`, { method: 'PATCH', body: rosterForm });
+      setEditingRoster(null); load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const doDeleteRoster = async () => {
+    setBusy(true); setError('');
+    try {
+      await api(`/api/v1/personnel/${deletingRoster}`, { method: 'DELETE' });
+      setDeletingRoster(null); load();
+    } catch (err) { setError(err.message); }
+    setBusy(false);
+  };
+
+  const exportCSV = () => {
+    downloadCSV('polaris-personnel.csv', [
+      ['Badge', 'Name', 'Status', 'Location', 'Zone', 'LastCheckin'],
+      ...list.map(p => [p.badgeId, p.userId?.fullName || p.userId?.username, p.currentStatus, p.currentLocation, p.assignedFieldZone, p.lastCheckIn])
+    ]);
   };
 
   if (loading) return <Spinner />;
@@ -84,6 +128,7 @@ export default function Personnel() {
           <p className="text-sm text-slate-500 dark:text-slate-400">{list.length} deployed · check-in from ship, station or field</p>
         </div>
         {canDeploy && <button className={btnPrimary} onClick={() => setShowDeploy(true)}>+ Deploy member</button>}
+        <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-1 text-xs'}>Export CSV</button>
       </div>
 
       {/* Deployment view: kitne / kahan / kaun */}
@@ -135,7 +180,17 @@ export default function Personnel() {
                   <Td><Pill value={p.currentStatus} /></Td>
                   <Td>{p.currentLocation || '—'}</Td>
                   <Td>{p.lastCheckIn ? new Date(p.lastCheckIn).toLocaleString() : '—'}</Td>
-                  <Td><button onClick={() => openCheckin(p)} className={btnGhost + ' !px-2 !py-1 text-xs'}>Check-in</button></Td>
+                  <Td>
+                    <div className="flex gap-1">
+                      <button onClick={() => openCheckin(p)} className={btnGhost + ' !px-2 !py-1 text-xs'}>Check-in</button>
+                      {canDeploy && (
+                        <>
+                          <button onClick={() => openRosterEdit(p)} className={btnGhost + ' !px-2 !py-1 text-xs'}>Edit</button>
+                          <button onClick={() => { setDeletingRoster(p._id); setError(''); }} className={btnGhost + ' !px-2 !py-1 text-xs text-red-500'}>Remove</button>
+                        </>
+                      )}
+                    </div>
+                  </Td>
                 </tr>
               ))}
             </tbody>
@@ -151,10 +206,10 @@ export default function Personnel() {
                 {STATUSES.map(s => <option key={s}>{s}</option>)}
               </select>
             </Field>
-            <Field label="Current location (ship / station / field)">
+            <Field label="Current location (live from Locations)">
               <select className={inputCls} value={checkForm.location} onChange={e => setCheckForm({ ...checkForm, location: e.target.value })}>
                 <option value="">— select —</option>
-                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+                {locOptions.map(l => <option key={l}>{l}</option>)}
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
@@ -184,14 +239,41 @@ export default function Personnel() {
               <Field label="Badge ID"><input className={inputCls} required value={depForm.badgeId} onChange={e => setDepForm({ ...depForm, badgeId: e.target.value })} placeholder="POL-007" /></Field>
               <Field label="Role title"><input className={inputCls} value={depForm.roleTitle} onChange={e => setDepForm({ ...depForm, roleTitle: e.target.value })} placeholder="Glaciologist" /></Field>
             </div>
-            <Field label="Starting location">
+            <Field label="Starting location (live from Locations)">
               <select className={inputCls} value={depForm.currentLocation} onChange={e => setDepForm({ ...depForm, currentLocation: e.target.value })}>
-                {LOCATIONS.map(l => <option key={l}>{l}</option>)}
+                {locOptions.map(l => <option key={l}>{l}</option>)}
               </select>
             </Field>
+            <ErrorNote message={error} />
             <button className={btnPrimary}>Deploy</button>
           </form>
         </Modal>
+      )}
+
+      {editingRoster && (
+        <Modal title="Edit roster entry" onClose={() => setEditingRoster(null)}>
+          <form onSubmit={saveRosterEdit} className="flex flex-col gap-3">
+            <Field label="Role title"><input className={inputCls} value={rosterForm.roleTitle} onChange={e => setRosterForm({ ...rosterForm, roleTitle: e.target.value })} /></Field>
+            <Field label="Field zone"><input className={inputCls} value={rosterForm.assignedFieldZone} onChange={e => setRosterForm({ ...rosterForm, assignedFieldZone: e.target.value })} /></Field>
+            <Field label="Status">
+              <select className={inputCls} value={rosterForm.currentStatus} onChange={e => setRosterForm({ ...rosterForm, currentStatus: e.target.value })}>
+                {STATUSES.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </Field>
+            <ErrorNote message={error} />
+            <button className={btnPrimary}>Save changes</button>
+          </form>
+        </Modal>
+      )}
+
+      {deletingRoster && (
+        <ConfirmDialog
+          title="Remove from roster?"
+          message="The roster entry is removed but movement history is kept. Recorded in audit log."
+          busy={busy}
+          onCancel={() => setDeletingRoster(null)}
+          onConfirm={doDeleteRoster}
+        />
       )}
     </div>
   );

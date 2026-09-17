@@ -43,6 +43,16 @@ router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsO
   } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
 
+// DELETE /api/v1/requirements/:id
+router.delete('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
+  const r = await Requirement.findById(req.params.id);
+  if (!r) return res.status(404).json({ error: 'Not found' });
+  await assertExpeditionOpen(r.expeditionId);
+  await r.deleteOne();
+  logAudit(req, 'delete', 'Requirement', r._id, { from: r.item });
+  res.json({ deleted: true });
+});
+
 // GET /api/v1/requirements/readiness/:expeditionId — real-data readiness (#8)
 router.get('/readiness/:expeditionId', async (req, res) => {
   const { expeditionId } = req.params;

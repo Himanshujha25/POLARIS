@@ -100,3 +100,34 @@ export const btnPrimary =
 
 export const btnGhost =
   'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
+
+export const btnDanger =
+  'rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50';
+
+export function ErrorNote({ message }) {
+  if (!message) return null;
+  return <p className="rounded-lg bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-400">{message}</p>;
+}
+
+export function ConfirmDialog({ title, message, confirmLabel = 'Delete', onConfirm, onCancel, busy }) {
+  return (
+    <Modal title={title} onClose={onCancel}>
+      <p className="text-sm text-slate-600 dark:text-slate-300">{message}</p>
+      <div className="mt-4 flex justify-end gap-2">
+        <button onClick={onCancel} className={btnGhost}>Cancel</button>
+        <button onClick={onConfirm} disabled={busy} className={btnDanger}>{busy ? 'Working…' : confirmLabel}</button>
+      </div>
+    </Modal>
+  );
+}
+
+export function downloadCSV(filename, rows) {
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = rows.map(r => r.map(esc).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}

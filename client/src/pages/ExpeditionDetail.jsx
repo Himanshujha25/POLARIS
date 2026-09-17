@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
+import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost } from '../components/ui';
+import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
 
 const TABS = ['Overview', 'Requirements', 'Cargo', 'Personnel', 'Timeline', 'Report'];
 const CATS = ['Provisions', 'HazardousFuel', 'ScientificInstruments', 'HeavySpares', 'MedicalLifeSupport'];
@@ -17,6 +18,7 @@ export default function ExpeditionDetail() {
   const [movements, setMovements] = useState([]);
   const [events, setEvents] = useState([]);
   const [showReq, setShowReq] = useState(false);
+  const [reqError, setReqError] = useState('');
   const [form, setForm] = useState({ item: '', category: 'Provisions', requiredQty: 100, unit: 'Units', priority: 'P2' });
 
   const canEdit = ['SuperAdmin', 'ExpeditionManager'].includes(user?.role);
@@ -35,11 +37,25 @@ export default function ExpeditionDetail() {
     } catch { /* ignore */ }
   };
   useEffect(() => { load(); }, [id]);
+  useLiveRefresh(load);
 
   const createReq = async (e) => {
     e.preventDefault();
-    await api('/api/v1/requirements', { method: 'POST', body: { ...form, expeditionId: id, requiredQty: Number(form.requiredQty) } });
-    setShowReq(false); setForm({ item: '', category: 'Provisions', requiredQty: 100, unit: 'Units', priority: 'P2' }); load();
+    setReqError('');
+    try {
+      await api('/api/v1/requirements', { method: 'POST', body: { ...form, expeditionId: id, requiredQty: Number(form.requiredQty) } });
+      setShowReq(false);
+      setForm({ item: '', category: 'Provisions', requiredQty: 100, unit: 'Units', priority: 'P2' });
+      load();
+    } catch (err) { setReqError(err.message); }
+  };
+
+  const deleteReq = async (reqId) => {
+    if (!window.confirm('Delete this requirement?')) return;
+    try {
+      await api(`/api/v1/requirements/${reqId}`, { method: 'DELETE' });
+      load();
+    } catch (err) { alert(err.message); }
   };
 
   if (!d) return <Spinner />;
@@ -97,7 +113,7 @@ export default function ExpeditionDetail() {
           {reqs.length === 0 ? <Empty text="No requirements yet — add Food 800kg, Fuel 5000L…" /> : (
             <TableWrap>
               <table className="w-full">
-                <thead><tr><Th>Item</Th><Th>Priority</Th><Th>Required</Th><Th>Received</Th><Th>Pending</Th></tr></thead>
+                <thead><tr><Th>Item</Th><Th>Priority</Th><Th>Required</Th><Th>Received</Th><Th>Pending</Th>{canEdit && <Th>Action</Th>}</tr></thead>
                 <tbody>
                   {reqs.map(r => (
                     <tr key={r._id} className="border-t border-slate-100 dark:border-slate-800">
@@ -106,6 +122,7 @@ export default function ExpeditionDetail() {
                       <Td>{r.requiredQty} {r.unit}</Td>
                       <Td>{r.receivedQty} {r.unit}</Td>
                       <Td className={r.pendingQty > 0 ? 'text-amber-500' : 'text-emerald-500'}>{r.pendingQty} {r.unit}</Td>
+                      {canEdit && <Td><button onClick={() => deleteReq(r._id)} className={btnGhost + ' !px-2 !py-1 text-xs text-red-500'}>Delete</button></Td>}
                     </tr>
                   ))}
                 </tbody>
@@ -183,6 +200,7 @@ export default function ExpeditionDetail() {
               <Field label="Required qty"><input type="number" className={inputCls} value={form.requiredQty} onChange={e => setForm({ ...form, requiredQty: e.target.value })} /></Field>
               <Field label="Unit"><input className={inputCls} value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} /></Field>
             </div>
+            <ErrorNote message={reqError} />
             <button className={btnPrimary}>Add</button>
           </form>
         </Modal>

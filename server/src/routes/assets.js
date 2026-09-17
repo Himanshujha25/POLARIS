@@ -41,6 +41,27 @@ router.patch('/:id/telemetry', async (req, res) => {
   res.json(asset);
 });
 
+// PATCH /api/v1/assets/:id — edit master data
+router.patch('/:id', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), async (req, res) => {
+  const asset = await Asset.findById(req.params.id);
+  if (!asset) return res.status(404).json({ error: 'Not found' });
+  ['name', 'station', 'type', 'condition', 'maxHoursBeforeService', 'assignedToPersonnelId'].forEach(f => {
+    if (req.body[f] !== undefined) asset[f] = req.body[f];
+  });
+  await asset.save();
+  res.json(asset);
+});
+
+// DELETE /api/v1/assets/:id — blocked when service history exists
+router.delete('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
+  const asset = await Asset.findById(req.params.id);
+  if (!asset) return res.status(404).json({ error: 'Not found' });
+  const n = await MaintenanceLog.countDocuments({ assetId: asset._id });
+  if (n > 0) return res.status(400).json({ error: `Cannot delete: ${n} maintenance records exist. Mark Retired instead.` });
+  await asset.deleteOne();
+  res.json({ deleted: true });
+});
+
 // POST /api/v1/assets/:id/maintenance
 router.post('/:id/maintenance', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), async (req, res) => {
   const asset = await Asset.findById(req.params.id);

@@ -12,11 +12,19 @@ export default function IncidentDetail() {
   const [summary, setSummary] = useState('');
   const [action, setAction] = useState('');
   const [showAction, setShowAction] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [responders, setResponders] = useState([]);
 
   const canManage = ['SuperAdmin', 'ExpeditionManager', 'EmergencyOfficer'].includes(user?.role);
 
   const load = async () => {
-    try { setD(await api(`/api/v1/incidents/${id}`)); } catch { /* ignore */ }
+    try {
+      const [detail, u] = await Promise.all([
+        api(`/api/v1/incidents/${id}`),
+        api('/api/v1/auth/users').catch(() => [])
+      ]);
+      setD(detail); setUsers(Array.isArray(u) ? u : []);
+    } catch { /* ignore */ }
   };
   useEffect(() => { load(); }, [id]);
 
@@ -24,11 +32,18 @@ export default function IncidentDetail() {
   const { incident: i, rollCall, resources, timeline, allowedNext } = d;
 
   const changeStatus = async () => {
-    if (!status) return;
+    if (!status && responders.length === 0) return;
     try {
-      await api(`/api/v1/incidents/${id}/status`, { method: 'PATCH', body: { status, resolutionSummary: summary || undefined } });
-      setStatus(''); setSummary(''); load();
+      await api(`/api/v1/incidents/${id}/status`, {
+        method: 'PATCH',
+        body: { status: status || undefined, resolutionSummary: summary || undefined, responderIds: responders.length ? responders : undefined }
+      });
+      setStatus(''); setSummary(''); setResponders([]); load();
     } catch (err) { alert(err.message); }
+  };
+
+  const toggleResponder = (uid) => {
+    setResponders(r => (r.includes(uid) ? r.filter(x => x !== uid) : [...r, uid]));
   };
 
   const addAction = async (e) => {
@@ -49,16 +64,37 @@ export default function IncidentDetail() {
         {i.resolutionSummary && <p className="mt-2 rounded-lg bg-emerald-500/10 p-2 text-sm">Resolution: {i.resolutionSummary}</p>}
 
         {canManage && allowedNext.length > 0 && (
-          <div className="mt-3 flex flex-col gap-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50 sm:flex-row">
-            <select className={inputCls} value={status} onChange={e => setStatus(e.target.value)}>
-              <option value="">— change status —</option>
-              {allowedNext.map(s => <option key={s}>{s}</option>)}
-            </select>
-            {(status === 'Resolved' || status === 'Closed') && (
-              <input className={inputCls} placeholder="Resolution summary (required)" value={summary} onChange={e => setSummary(e.target.value)} />
+          <div className="mt-3 flex flex-col gap-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <select className={inputCls} value={status} onChange={e => setStatus(e.target.value)}>
+                <option value="">— change status —</option>
+                {allowedNext.map(s => <option key={s}>{s}</option>)}
+              </select>
+              {(status === 'Resolved' || status === 'Closed') && (
+                <input className={inputCls} placeholder="Resolution summary (required)" value={summary} onChange={e => setSummary(e.target.value)} />
+              )}
+              <button onClick={changeStatus} className={btnPrimary}>Apply</button>
+            </div>
+            {users.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs font-semibold text-slate-500">Assign responders</p>
+                <div className="flex flex-wrap gap-1">
+                  {users.map(u => (
+                    <button
+                      key={u._id}
+                      onClick={() => toggleResponder(u._id)}
+                      className={`rounded-full border px-2 py-0.5 text-xs ${responders.includes(u._id) ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300' : 'border-slate-300 dark:border-slate-600'}`}
+                    >
+                      {u.fullName} ({u.role})
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
-            <button onClick={changeStatus} className={btnPrimary}>Apply</button>
           </div>
+        )}
+        {i.responderIds && i.responderIds.length > 0 && (
+          <p className="mt-2 text-sm">Responders: {i.responderIds.map(r => r.fullName || r.username).join(', ')}</p>
         )}
       </Card>
 

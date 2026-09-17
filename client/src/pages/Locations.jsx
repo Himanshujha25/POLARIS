@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
+import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
 
 const TYPES = ['Station', 'Warehouse', 'Camp', 'Vessel', 'Port', 'Hub', 'Aircraft', 'Temporary', 'Headquarters'];
 
@@ -13,6 +13,10 @@ export default function Locations() {
   const [resupplyId, setResupplyId] = useState(null);
   const [resupplyDate, setResupplyDate] = useState('');
   const [form, setForm] = useState({ name: '', type: 'Camp', parentId: '', region: '' });
+  const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const canEdit = ['SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'].includes(user?.role);
 
@@ -25,8 +29,35 @@ export default function Locations() {
 
   const create = async (e) => {
     e.preventDefault();
-    await api('/api/v1/locations', { method: 'POST', body: { ...form, parentId: form.parentId || undefined } });
-    setShow(false); setForm({ name: '', type: 'Camp', parentId: '', region: '' }); load();
+    setError('');
+    try {
+      await api('/api/v1/locations', { method: 'POST', body: { ...form, parentId: form.parentId || undefined } });
+      setShow(false); setForm({ name: '', type: 'Camp', parentId: '', region: '' }); load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const openEdit = (l) => {
+    setEditing(l._id);
+    setForm({ name: l.name, type: l.type, parentId: l.parentId?._id || l.parentId || '', region: l.region || '' });
+    setError('');
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await api(`/api/v1/locations/${editing}`, { method: 'PATCH', body: { ...form, parentId: form.parentId || undefined } });
+      setEditing(null); load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const doDelete = async () => {
+    setBusy(true); setError('');
+    try {
+      await api(`/api/v1/locations/${deleting}`, { method: 'DELETE' });
+      setDeleting(null); load();
+    } catch (err) { setError(err.message); }
+    setBusy(false);
   };
 
   const saveResupply = async (e) => {
@@ -62,9 +93,13 @@ export default function Locations() {
               Next resupply: {l.nextResupplyDate ? new Date(l.nextResupplyDate).toLocaleDateString() : 'not set'}
             </p>
             {canEdit && (
-              <button onClick={() => { setResupplyId(l._id); setResupplyDate(l.nextResupplyDate ? l.nextResupplyDate.slice(0, 10) : ''); }} className={btnGhost + ' mt-2 !px-3 !py-1 text-xs'}>
-                Set resupply date
-              </button>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button onClick={() => { setResupplyId(l._id); setResupplyDate(l.nextResupplyDate ? l.nextResupplyDate.slice(0, 10) : ''); }} className={btnGhost + ' !px-3 !py-1 text-xs'}>
+                  Set resupply date
+                </button>
+                <button onClick={() => openEdit(l)} className={btnGhost + ' !px-3 !py-1 text-xs'}>Edit</button>
+                <button onClick={() => { setDeleting(l._id); setError(''); }} className={btnGhost + ' !px-3 !py-1 text-xs text-red-500'}>Delete</button>
+              </div>
             )}
           </Card>
         ))}
@@ -88,9 +123,38 @@ export default function Locations() {
               </Field>
             </div>
             <Field label="Region"><input className={inputCls} value={form.region} onChange={e => setForm({ ...form, region: e.target.value })} placeholder="Antarctica" /></Field>
+            <ErrorNote message={error} />
             <button className={btnPrimary}>Create</button>
           </form>
         </Modal>
+      )}
+
+      {editing && (
+        <Modal title="Edit location" onClose={() => setEditing(null)}>
+          <form onSubmit={saveEdit} className="flex flex-col gap-3">
+            <Field label="Name"><input className={inputCls} required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Type">
+                <select className={inputCls} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+                  {TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Region"><input className={inputCls} value={form.region} onChange={e => setForm({ ...form, region: e.target.value })} /></Field>
+            </div>
+            <ErrorNote message={error} />
+            <button className={btnPrimary}>Save changes</button>
+          </form>
+        </Modal>
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete location?"
+          message="Blocked if stock or personnel reference it. Child locations are removed too."
+          busy={busy}
+          onCancel={() => setDeleting(null)}
+          onConfirm={doDelete}
+        />
       )}
 
       {resupplyId && (

@@ -38,8 +38,8 @@ router.get('/me', authRequired, async (req, res) => {
   res.json(user);
 });
 
-// GET /api/v1/auth/users (SuperAdmin only)
-router.get('/users', authRequired, requireRoles('SuperAdmin'), async (req, res) => {
+// GET /api/v1/auth/users (officers need it for responders/manager pickers)
+router.get('/users', authRequired, requireRoles('SuperAdmin', 'ExpeditionManager', 'EmergencyOfficer', 'PersonnelOfficer'), async (req, res) => {
   res.json(await User.find().select('-passwordHash').sort({ createdAt: -1 }).limit(200));
 });
 

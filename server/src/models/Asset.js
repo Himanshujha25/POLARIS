@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const assetSchema = new mongoose.Schema({
   assetTag: { type: String, required: true, unique: true, index: true },
-  station: { type: String, enum: ['Bharati', 'Maitri', 'Himadri'], required: true },
+  station: { type: String, required: true },
   name: { type: String, required: true },
   type: {
     type: String,

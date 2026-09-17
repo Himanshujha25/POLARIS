@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const expeditionSchema = new mongoose.Schema({
   expeditionCode: { type: String, required: true, unique: true, index: true },
   title: { type: String, required: true },
-  targetStation: { type: String, enum: ['Bharati', 'Maitri', 'Himadri', 'Dakshin_Gangotri'], required: true },
+  targetStation: { type: String, required: true },
   season: { type: String, enum: ['Summer_2026_27', 'Winter_2027', 'Special_Cruise'], default: 'Summer_2026_27' },
   startDate: Date,
   endDate: Date,

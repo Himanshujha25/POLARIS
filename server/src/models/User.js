@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
     type: String, required: true,
     enum: ['SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer', 'InventoryOfficer', 'PersonnelOfficer', 'AssetOfficer', 'EmergencyOfficer']
   },
-  station: { type: String, enum: ['Bharati', 'Maitri', 'Himadri', 'Headquarters_Goa'], default: 'Headquarters_Goa' },
+  station: { type: String, default: 'Headquarters_Goa' },
   bloodGroup: String,
   emergencyContact: { name: String, relation: String, phone: String },
   isActive: { type: Boolean, default: true }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
 
@@ -23,6 +24,7 @@ export default function Incidents() {
     setLoading(false);
   };
   useEffect(() => { load(); }, [showActive]);
+  useLiveRefresh(load);
 
   const create = async (e) => {
     e.preventDefault();

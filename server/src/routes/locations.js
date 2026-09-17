@@ -42,4 +42,23 @@ router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsO
   res.json(loc);
 });
 
+// DELETE /api/v1/locations/:id — blocked when stock or people reference it
+router.delete('/:id', requireRoles('SuperAdmin'), async (req, res) => {
+  const Inventory = require('../models/Inventory');
+  const Personnel = require('../models/Personnel');
+  const loc = await Location.findById(req.params.id);
+  if (!loc) return res.status(404).json({ error: 'Not found' });
+  const [inv, ppl] = await Promise.all([
+    Inventory.countDocuments({ station: loc.name.replace(' Station', '') }),
+    Personnel.countDocuments({ currentLocation: loc.name })
+  ]);
+  if (inv + ppl > 0) {
+    return res.status(400).json({ error: `Cannot delete: ${inv} stock lines, ${ppl} personnel reference ${loc.name}.` });
+  }
+  await Location.deleteMany({ parentId: loc._id });
+  await loc.deleteOne();
+  logAudit(req, 'delete', 'Location', loc._id, { from: loc.name });
+  res.json({ deleted: true });
+});
+
 module.exports = router;

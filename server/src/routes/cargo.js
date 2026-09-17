@@ -148,6 +148,32 @@ router.get('/:id/timeline', async (req, res) => {
   res.json(events);
 });
 
+// PATCH /api/v1/cargo/:id — edit details (title, ETA, hazmat, items)
+router.patch('/:id', requireRoles(...CAN_WRITE), async (req, res) => {
+  try {
+    const cargo = await Cargo.findById(req.params.id);
+    if (!cargo) return res.status(404).json({ error: 'Not found' });
+    await assertExpeditionOpen(cargo.expeditionId);
+    ['title', 'weightKg', 'volumeM3', 'isHazmat', 'eta', 'transportMode', 'items'].forEach(f => {
+      if (req.body[f] !== undefined) cargo[f] = req.body[f];
+    });
+    await cargo.save();
+    await logEvent(cargo, 'Note', req, { reason: 'Cargo details edited' });
+    logAudit(req, 'update', 'Cargo', cargo._id, { details: 'cargo edited' });
+    res.json(cargo);
+  } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+});
+
+// DELETE /api/v1/cargo/:id — history kept in audit log
+router.delete('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
+  const cargo = await Cargo.findById(req.params.id);
+  if (!cargo) return res.status(404).json({ error: 'Not found' });
+  await CargoEvent.deleteMany({ cargoId: cargo._id });
+  await cargo.deleteOne();
+  logAudit(req, 'delete', 'Cargo', cargo._id, { from: cargo.trackingNumber });
+  res.json({ deleted: true });
+});
+
 // GET /api/v1/cargo/track/:trackingNumber — QR lookup
 router.get('/track/:trackingNumber', async (req, res) => {
   const cargo = await Cargo.findOne({ trackingNumber: req.params.trackingNumber });

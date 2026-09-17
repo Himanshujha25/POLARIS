@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Siren, FlaskConical } from 'lucide-react';
 import { api } from '../lib/api';
+import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
 
@@ -25,6 +26,7 @@ export default function Alerts() {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+  useLiveRefresh(load);
 
   const sendSos = async (e) => {
     e.preventDefault();

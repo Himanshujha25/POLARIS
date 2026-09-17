@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Rocket, Package, Boxes, Users, Wrench, Map as MapIcon,
   Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog,
-  MapPin, Flame, FileBarChart, BarChart3, ScrollText
+  MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -28,6 +28,7 @@ const links = [
   { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: [SA, EM] },
   { to: '/audit', label: 'Audit Logs', icon: ScrollText, roles: [SA, EM] },
   { to: '/users', label: 'Team & Roles', icon: UserCog, roles: [SA] },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon, roles: [SA] },
 ];
 
 function navCls({ isActive }) {

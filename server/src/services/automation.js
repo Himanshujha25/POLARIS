@@ -3,6 +3,7 @@ const Inventory = require('../models/Inventory');
 const Asset = require('../models/Asset');
 const Cargo = require('../models/Cargo');
 const Alert = require('../models/Alert');
+const Setting = require('../models/Setting');
 
 let ioRef = null;
 function setIO(io) { ioRef = io; }
@@ -19,7 +20,7 @@ async function createAlertOnce(filter, doc) {
 }
 
 async function checkDeadman() {
-  const windowMin = parseInt(process.env.DEADMAN_MINUTES || '45', 10);
+  const windowMin = await getConfig('deadmanMinutes', process.env.DEADMAN_MINUTES || '45');
   const cutoff = new Date(Date.now() - windowMin * 60 * 1000);
   const overdue = await Personnel.find({
     currentStatus: 'FieldResearch',
@@ -71,17 +72,20 @@ async function checkDepletion() {
 }
 
 async function checkMaintenance() {
-  const assets = await Asset.find({ condition: { $in: ['Operational', 'Degraded'] } }).limit(200);
+  const warnHours = await getConfig('maintWarnHours', '25');
+  const assets = await Asset.find({ condition: { $in: ['Operational', 'Degraded', 'InUse', 'Standby'] } }).limit(200);
   let flagged = 0;
   for (const a of assets) {
-    if (a.operatingHours >= (a.maxHoursBeforeService - 25)) {
+    const overdue = a.operatingHours >= a.maxHoursBeforeService;
+    const dueSoon = !overdue && a.operatingHours >= (a.maxHoursBeforeService - warnHours);
+    if (overdue || dueSoon) {
       await createAlertOnce(
         { type: 'EQUIPMENT_FAULT', sourceId: a._id },
         {
           type: 'EQUIPMENT_FAULT',
-          severity: 'WARNING',
-          title: `Maintenance due: ${a.assetTag}`,
-          message: `${a.operatingHours}/${a.maxHoursBeforeService} hrs. Schedule service.`,
+          severity: overdue ? 'CRITICAL' : 'WARNING',
+          title: overdue ? `Maintenance OVERDUE: ${a.assetTag}` : `Maintenance due: ${a.assetTag}`,
+          message: `${a.operatingHours}/${a.maxHoursBeforeService} hrs${overdue ? ' — service overdue, do not deploy' : '. Schedule service.'}`,
           sourceEntity: 'Asset',
           sourceId: a._id
         }
@@ -90,6 +94,22 @@ async function checkMaintenance() {
     }
   }
   return flagged;
+}
+
+// Runtime config with caching (DB setting wins, env fallback)
+let configCache = { at: 0, values: {} };
+async function getConfig(key, fallback) {
+  if (Date.now() - configCache.at < 5 * 60 * 1000 && configCache.values[key] !== undefined) {
+    return Number(configCache.values[key]);
+  }
+  try {
+    const s = await Setting.findOne({ key });
+    if (s) {
+      configCache = { at: Date.now(), values: { ...configCache.values, [key]: s.value } };
+      return Number(s.value);
+    }
+  } catch { /* fall through */ }
+  return Number(fallback);
 }
 
 async function checkCargoEta() {

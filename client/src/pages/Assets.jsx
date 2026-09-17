@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
+import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
 
 export default function Assets() {
   const { user } = useAuth();
@@ -12,6 +12,11 @@ export default function Assets() {
   const [hours, setHours] = useState('');
   const [maintId, setMaintId] = useState(null);
   const [desc, setDesc] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', station: '', maxHoursBeforeService: '' });
+  const [deleting, setDeleting] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -28,8 +33,38 @@ export default function Assets() {
 
   const saveMaint = async (e) => {
     e.preventDefault();
-    await api(`/api/v1/assets/${maintId}/maintenance`, { method: 'POST', body: { description: desc, partsUsed: [] } });
-    setMaintId(null); setDesc(''); load();
+    setError('');
+    try {
+      await api(`/api/v1/assets/${maintId}/maintenance`, { method: 'POST', body: { description: desc, partsUsed: [] } });
+      setMaintId(null); setDesc(''); load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const openEdit = (a) => {
+    setEditing(a._id);
+    setEditForm({ name: a.name, station: a.station, maxHoursBeforeService: a.maxHoursBeforeService });
+    setError('');
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await api(`/api/v1/assets/${editing}`, {
+        method: 'PATCH',
+        body: { name: editForm.name, station: editForm.station, maxHoursBeforeService: Number(editForm.maxHoursBeforeService) }
+      });
+      setEditing(null); load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const doDelete = async () => {
+    setBusy(true); setError('');
+    try {
+      await api(`/api/v1/assets/${deleting}`, { method: 'DELETE' });
+      setDeleting(null); load();
+    } catch (err) { setError(err.message); }
+    setBusy(false);
   };
 
   if (loading) return <Spinner />;
@@ -61,9 +96,11 @@ export default function Assets() {
               </p>
             )}
             {canEdit && (
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button onClick={() => { setTeleId(a._id); setHours(a.operatingHours); }} className={btnGhost + ' !px-3 !py-1 text-xs'}>Log hours</button>
                 <button onClick={() => setMaintId(a._id)} className={btnGhost + ' !px-3 !py-1 text-xs'}>Maintenance</button>
+                <button onClick={() => openEdit(a)} className={btnGhost + ' !px-3 !py-1 text-xs'}>Edit</button>
+                <button onClick={() => { setDeleting(a._id); setError(''); }} className={btnGhost + ' !px-3 !py-1 text-xs text-red-500'}>Delete</button>
               </div>
             )}
           </Card>
@@ -82,9 +119,32 @@ export default function Assets() {
         <Modal title="Record maintenance" onClose={() => setMaintId(null)}>
           <form onSubmit={saveMaint} className="flex flex-col gap-3">
             <Field label="Description"><input className={inputCls} value={desc} onChange={e => setDesc(e.target.value)} placeholder="Oil + filter change" /></Field>
+            <ErrorNote message={error} />
             <button className={btnPrimary}>Complete service</button>
           </form>
         </Modal>
+      )}
+      {editing && (
+        <Modal title="Edit asset" onClose={() => setEditing(null)}>
+          <form onSubmit={saveEdit} className="flex flex-col gap-3">
+            <Field label="Name"><input className={inputCls} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Station"><input className={inputCls} value={editForm.station} onChange={e => setEditForm({ ...editForm, station: e.target.value })} /></Field>
+              <Field label="Service every (hrs)"><input type="number" className={inputCls} value={editForm.maxHoursBeforeService} onChange={e => setEditForm({ ...editForm, maxHoursBeforeService: e.target.value })} /></Field>
+            </div>
+            <ErrorNote message={error} />
+            <button className={btnPrimary}>Save changes</button>
+          </form>
+        </Modal>
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title="Delete asset?"
+          message="Blocked if service history exists — mark Retired instead. Recorded in audit log."
+          busy={busy}
+          onCancel={() => setDeleting(null)}
+          onConfirm={doDelete}
+        />
       )}
     </div>
   );

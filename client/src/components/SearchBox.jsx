@@ -40,13 +40,13 @@ export default function SearchBox() {
   const total = results ? Object.values(results).reduce((s, a) => s + a.length, 0) : 0;
 
   return (
-    <div className="relative hidden sm:block">
+    <div className="relative">
       <form onSubmit={search} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700">
-        <Search size={16} className="text-slate-400" />
+        <Search size={16} className="shrink-0 text-slate-400" />
         <input
           value={q} onChange={e => setQ(e.target.value)}
-          placeholder="Search ID, cargo, asset, person…"
-          className="w-44 bg-transparent text-sm outline-none placeholder:text-slate-400 lg:w-56"
+          placeholder="Search…"
+          className="w-24 bg-transparent text-sm outline-none placeholder:text-slate-400 sm:w-44 lg:w-56"
         />
       </form>
       {open && results && (

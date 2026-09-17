@@ -14,6 +14,8 @@ export default function Users() {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ username: '', email: '', password: 'Test@123', fullName: '', role: 'PersonnelOfficer', station: 'Maitri' });
   const [error, setError] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
+  const [userForm, setUserForm] = useState({ role: '', station: '', fullName: '' });
 
   if (user?.role !== 'SuperAdmin') return <Navigate to="/command" replace />;
 
@@ -30,9 +32,32 @@ export default function Users() {
     try {
       await api('/api/v1/auth/register', { method: 'POST', body: form });
       setShow(false);
-      setForm({ username: '', email: '', password: 'Test@123', fullName: '', role: 'FieldScientist', station: 'Maitri' });
+      setForm({ username: '', email: '', password: 'Test@123', fullName: '', role: 'PersonnelOfficer', station: 'Maitri' });
       load();
     } catch (err) { setError(err.message); }
+  };
+
+  const openUserEdit = (u) => {
+    setEditingUser(u._id);
+    setUserForm({ role: u.role, station: u.station || '', fullName: u.fullName });
+    setError('');
+  };
+
+  const saveUserEdit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await api(`/api/v1/auth/users/${editingUser}`, { method: 'PATCH', body: userForm });
+      setEditingUser(null); load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const toggleActive = async (u) => {
+    if (!window.confirm(`${u.isActive ? 'Deactivate' : 'Activate'} ${u.username}?`)) return;
+    try {
+      await api(`/api/v1/auth/users/${u._id}`, { method: 'PATCH', body: { isActive: !u.isActive } });
+      load();
+    } catch (err) { alert(err.message); }
   };
 
   if (loading) return <Spinner />;
@@ -51,7 +76,7 @@ export default function Users() {
       <Card className="p-0">
         <TableWrap>
           <table className="w-full">
-            <thead><tr><Th>Username</Th><Th>Name</Th><Th>Role</Th><Th>Station</Th><Th>Active</Th></tr></thead>
+            <thead><tr><Th>Username</Th><Th>Name</Th><Th>Role</Th><Th>Station</Th><Th>Active</Th><Th>Actions</Th></tr></thead>
             <tbody>
               {list.map(u => (
                 <tr key={u._id} className="border-t border-slate-100 dark:border-slate-800">
@@ -60,6 +85,12 @@ export default function Users() {
                   <Td><Pill value={u.role} /></Td>
                   <Td>{u.station}</Td>
                   <Td>{u.isActive ? 'Yes' : 'No'}</Td>
+                  <Td>
+                    <div className="flex gap-1">
+                      <button onClick={() => openUserEdit(u)} className={btnGhost + ' !px-2 !py-1 text-xs'}>Edit</button>
+                      <button onClick={() => toggleActive(u)} className={btnGhost + ' !px-2 !py-1 text-xs'}>{u.isActive ? 'Deactivate' : 'Activate'}</button>
+                    </div>
+                  </Td>
                 </tr>
               ))}
             </tbody>
@@ -102,6 +133,24 @@ export default function Users() {
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
             <button className={btnPrimary}>Create</button>
+          </form>
+        </Modal>
+      )}
+
+      {editingUser && (
+        <Modal title="Edit user" onClose={() => setEditingUser(null)}>
+          <form onSubmit={saveUserEdit} className="flex flex-col gap-3">
+            <Field label="Full name"><input className={inputCls} value={userForm.fullName} onChange={e => setUserForm({ ...userForm, fullName: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Role">
+                <select className={inputCls} value={userForm.role} onChange={e => setUserForm({ ...userForm, role: e.target.value })}>
+                  {ROLES.map(r => <option key={r}>{r}</option>)}
+                </select>
+              </Field>
+              <Field label="Station"><input className={inputCls} value={userForm.station} onChange={e => setUserForm({ ...userForm, station: e.target.value })} /></Field>
+            </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            <button className={btnPrimary}>Save changes</button>
           </form>
         </Modal>
       )}

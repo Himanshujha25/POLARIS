@@ -83,4 +83,10 @@ PRD marks it optional ("keep usable without AI"). Deterministic logic used every
 - Server: `cd server; node server.js` (`:5000`, Atlas via `.env`) — restart required after pulls (stale `node` processes squat the port).
 - Client: `cd client; npm run dev` (`:5173`).
 - Logins (Test@123): `admin` (SuperAdmin), `commander` (ExpeditionManager), `logistics`, `inventory`, `rahul` (EmergencyOfficer).
-- Verify: `cd server; npm run smoke` (needs `BASE` env if port differs).
+- Verify: `cd server; npm run smoke` (needs `BASE` env if port differs). **Note: smoke creates TEST-/SMOKE- records — run only when verifying, then wipe if a clean demo DB is needed.**
+
+## 6. Live-data update (17 Sep 2026, evening)
+- Atlas wiped clean of all test/seed records (16 collections, 5 users kept).
+- Station/location enums relaxed to free strings — new Locations work everywhere.
+- All dropdowns (check-in, deploy, expedition station, inventory filters/transfers) read live from Locations API with fallbacks.
+- `useLiveRefresh` hook: list pages auto-reload on socket events + window focus — admin changes appear across screens without manual refresh.

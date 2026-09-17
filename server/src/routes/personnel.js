@@ -23,10 +23,17 @@ router.get('/', async (req, res) => {
   res.json(list);
 });
 
-// POST /api/v1/personnel — create roster entry
+// POST /api/v1/personnel — create roster entry (no duplicate active deployment)
 router.post('/', async (req, res) => {
   try {
     if (req.body.expeditionId) await assertExpeditionOpen(req.body.expeditionId);
+    if (req.body.userId && req.body.expeditionId) {
+      const dup = await Personnel.findOne({
+        userId: req.body.userId, expeditionId: req.body.expeditionId,
+        currentStatus: { $ne: 'Returned' }
+      });
+      if (dup) return res.status(400).json({ error: `User already deployed as ${dup.badgeId} (${dup.currentStatus}). Mark Returned first.` });
+    }
     const p = await Personnel.create(req.body);
     await PersonnelMovement.create({
       personnelId: p._id, expeditionId: p.expeditionId,
@@ -108,6 +115,27 @@ router.post('/telemetry', async (req, res) => {
     if (io) io.emit('alert:new', alert);
   }
   res.json({ personnel: p, geofenceBreach: zone, alert });
+});
+
+// PATCH /api/v1/personnel/:id — edit roster fields
+router.patch('/:id', async (req, res) => {
+  const p = await Personnel.findOne({ _id: req.params.id });
+  if (!p) return res.status(404).json({ error: 'Not found' });
+  ['roleTitle', 'assignedFieldZone', 'currentStatus', 'currentLocation', 'expectedReturn'].forEach(f => {
+    if (req.body[f] !== undefined) p[f] = req.body[f];
+  });
+  await p.save();
+  logAudit(req, 'update', 'Personnel', p._id, { details: 'roster edited' });
+  res.json(p);
+});
+
+// DELETE /api/v1/personnel/:id — roster entry removed, movement history kept
+router.delete('/:id', async (req, res) => {
+  const p = await Personnel.findById(req.params.id);
+  if (!p) return res.status(404).json({ error: 'Not found' });
+  await p.deleteOne();
+  logAudit(req, 'delete', 'Personnel', p._id, { from: p.badgeId });
+  res.json({ deleted: true });
 });
 
 // GET /api/v1/personnel/movements?personnelId=&expeditionId= — movement history timeline

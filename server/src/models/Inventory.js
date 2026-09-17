@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const inventorySchema = new mongoose.Schema({
-  station: { type: String, enum: ['Bharati', 'Maitri', 'Himadri'], required: true },
+  station: { type: String, required: true },
   category: {
     type: String,
     enum: ['Fuel', 'FoodRations', 'Medical', 'OxygenCylinders', 'RO_Water', 'GeneratorSpares'],
