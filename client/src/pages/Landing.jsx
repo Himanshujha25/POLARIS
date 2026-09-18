@@ -28,10 +28,16 @@ export default function Landing() {
   const { user } = useAuth();
   const [health, setHealth] = useState('checking');
 
-  useEffect(() => {
+  const checkHealth = () => {
     fetch(API_BASE + '/api/v1/health')
       .then(r => setHealth(r.ok ? 'online' : 'offline'))
       .catch(() => setHealth('offline'));
+  };
+
+  useEffect(() => {
+    checkHealth();
+    const interval = setInterval(checkHealth, 2500);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -74,10 +80,15 @@ export default function Landing() {
             Explore modules
           </a>
         </div>
-        <p className="mt-4 inline-flex items-center gap-2 text-xs text-slate-500">
+        <button
+          type="button"
+          onClick={checkHealth}
+          className="mt-4 inline-flex items-center gap-2 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          title="Click to recheck API status"
+        >
           <span className={`inline-block h-2 w-2 rounded-full ${health === 'online' ? 'bg-emerald-500' : health === 'offline' ? 'bg-red-500' : 'bg-amber-500'}`} />
-          {health === 'online' ? 'API live — all systems operational' : health === 'offline' ? 'API offline — start the server' : 'Checking API status…'}
-        </p>
+          {health === 'online' ? 'API live — all systems operational' : health === 'offline' ? 'API offline — start the server (retrying…)' : 'Checking API status…'}
+        </button>
       </section>
 
       {/* Modules */}

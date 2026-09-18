@@ -86,7 +86,7 @@ router.get('/:id', async (req, res) => {
 
 // PATCH /api/v1/incidents/:id/status — workflow transitions
 router.patch('/:id/status', requireRoles(...CAN_MANAGE), async (req, res) => {
-  const { status, resolutionSummary, responderIds } = req.body || {};
+  const { status, resolutionSummary, responderIds, affectedAssetIds } = req.body || {};
   const inc = await Incident.findById(req.params.id);
   if (!inc) return res.status(404).json({ error: 'Not found' });
   if (status && !(NEXT[inc.status] || []).includes(status)) {
@@ -97,6 +97,10 @@ router.patch('/:id/status', requireRoles(...CAN_MANAGE), async (req, res) => {
   if (responderIds) {
     inc.responderIds = responderIds;
     await addAction(inc._id, 'ResponderAssigned', `${responderIds.length} responder(s) assigned`, req.user.id);
+  }
+  if (affectedAssetIds) {
+    inc.affectedAssetIds = affectedAssetIds;
+    await addAction(inc._id, 'AssetAssigned', `${affectedAssetIds.length} asset(s) deployed/affected`, req.user.id);
   }
   if (['Resolved', 'Closed'].includes(inc.status)) {
     if (!resolutionSummary && !inc.resolutionSummary) {

@@ -3,11 +3,12 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Rocket, Package, Boxes, Users, Wrench, Map as MapIcon,
   Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog,
-  MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon
+  MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon, Radio
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import SearchBox from './SearchBox';
+import QuickDemoBar from './QuickDemoBar';
 
 // PRD persona scopes (Master PRD Section 5)
 const SA = 'SuperAdmin', EM = 'ExpeditionManager', LO = 'LogisticsOfficer',
@@ -110,8 +111,20 @@ export default function Layout({ children }) {
             <Snowflake className="text-cyan-500" size={22} />
             <p className="font-extrabold tracking-wide">POLARIS</p>
           </div>
+
+          {/* Polar Satellite Link Indicator */}
+          <div className="hidden lg:flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <Radio size={12} />
+            <span>SAT-LINK: IRIDIUM NEXT</span>
+          </div>
+
           <div className="flex-1" />
           <SearchBox />
+          <QuickDemoBar />
           <button
             onClick={() => setShowFeed(v => !v)}
             className="relative rounded-lg border border-slate-200 p-2 dark:border-slate-700"

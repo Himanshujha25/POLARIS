@@ -9,10 +9,14 @@ const { Server } = require('socket.io');
 
 const connectDB = require('./config/db');
 const { startAutomation } = require('./services/automation');
+const { seedDefaultUsers } = require('./utils/seed');
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' && process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN : true,
+  credentials: true
+}));
 app.use(express.json({ limit: '200kb' }));
 app.use(mongoSanitize());
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
@@ -55,6 +59,7 @@ const PORT = process.env.PORT || 5000;
 
 async function start() {
   await connectDB();
+  await seedDefaultUsers().catch(e => console.warn('[seed] notice:', e.message));
   startAutomation(io, 60000);
   server.listen(PORT, () => console.log(`[server] POLARIS backend on :${PORT}`));
 }
