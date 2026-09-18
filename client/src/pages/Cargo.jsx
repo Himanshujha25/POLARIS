@@ -16,7 +16,15 @@ export default function Cargo() {
   const [track, setTrack] = useState('');
   const [tracked, setTracked] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ trackingNumber: '', title: '', category: 'Provisions', weightKg: 100, expeditionId: '' });
+  const [form, setForm] = useState({
+    trackingNumber: '',
+    title: '',
+    category: 'Provisions',
+    weightKg: 100,
+    expeditionId: '',
+    isHazmat: false,
+    itemsText: ''
+  });
   const [timeline, setTimeline] = useState(null);
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [receiveCargo, setReceiveCargo] = useState(null);
@@ -48,8 +56,31 @@ export default function Cargo() {
     e.preventDefault();
     setError('');
     try {
-      await api('/api/v1/cargo', { method: 'POST', body: { ...form, weightKg: Number(form.weightKg) } });
-      setShowCreate(false); load();
+      // Parse itemsText if provided: e.g. "Rice Rations: 200 Kilograms, High Energy Biscuits: 50 Units"
+      const items = form.itemsText
+        ? form.itemsText.split(',').map(part => {
+            const [namePart, qtyPart] = part.split(':');
+            const trimmedName = (namePart || '').trim();
+            const [qtyNum, unit] = (qtyPart || '').trim().split(/\s+/);
+            return {
+              name: trimmedName,
+              quantity: Number(qtyNum) || 1,
+              unit: unit || 'Units'
+            };
+          }).filter(it => it.name)
+        : [{ name: form.title, quantity: Number(form.weightKg) || 10, unit: 'Units' }];
+
+      await api('/api/v1/cargo', {
+        method: 'POST',
+        body: {
+          ...form,
+          weightKg: Number(form.weightKg),
+          items
+        }
+      });
+      setShowCreate(false);
+      setForm(f => ({ ...f, trackingNumber: '', title: '', itemsText: '' }));
+      load();
     } catch (err) { setError(err.message); }
   };
 
@@ -152,6 +183,18 @@ export default function Cargo() {
               <Pill value={c.status} />
             </div>
             <p className="text-sm">{c.title} · {c.weightKg}kg {c.isHazmat && '· ⚠️ HAZMAT'}</p>
+            {c.items && c.items.length > 0 && (
+              <div className="mt-1.5 rounded bg-slate-50 p-2 text-xs dark:bg-slate-800/40">
+                <p className="font-semibold text-slate-500 dark:text-slate-400">📦 Manifest / Container Items ({c.items.length}):</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {c.items.map((it, idx) => (
+                    <span key={idx} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-medium dark:border-slate-700 dark:bg-slate-800">
+                      {it.name}: <b>{it.quantity} {it.unit}</b>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <p className="mt-1 text-xs text-slate-500">NCPOR Goa → Port → Ship → Ice Shelf → Station</p>
             <p className="text-xs font-medium text-cyan-600 dark:text-cyan-400">Now: {c.currentNode} · ETA {c.eta ? new Date(c.eta).toLocaleDateString() : '—'}</p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -174,21 +217,44 @@ export default function Cargo() {
       </div>
 
       {showCreate && (
-        <Modal title="Register Cargo" onClose={() => setShowCreate(false)}>
+        <Modal title="Register Cargo & Manifest" onClose={() => setShowCreate(false)}>
           <form onSubmit={create} className="flex flex-col gap-3">
-            <Field label="Tracking Number"><input className={inputCls} required value={form.trackingNumber} onChange={e => setForm({ ...form, trackingNumber: e.target.value })} /></Field>
-            <Field label="Title"><input className={inputCls} required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></Field>
-            <Field label="Category">
-              <select className={inputCls} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                <option>Provisions</option><option>HazardousFuel</option><option>ScientificInstruments</option><option>HeavySpares</option><option>MedicalLifeSupport</option>
-              </select>
-            </Field>
-            <Field label="Expedition">
+            <Field label="Tracking Number / QR"><input className={inputCls} required placeholder="e.g. CRG-2027-BHR-002" value={form.trackingNumber} onChange={e => setForm({ ...form, trackingNumber: e.target.value })} /></Field>
+            <Field label="Consignment Title"><input className={inputCls} required placeholder="e.g. Winter Provisions Container #4" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Category">
+                <select className={inputCls} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                  <option>Provisions</option><option>HazardousFuel</option><option>ScientificInstruments</option><option>HeavySpares</option><option>MedicalLifeSupport</option>
+                </select>
+              </Field>
+              <Field label="Total Weight (kg)">
+                <input type="number" className={inputCls} required value={form.weightKg} onChange={e => setForm({ ...form, weightKg: e.target.value })} />
+              </Field>
+            </div>
+            <Field label="Expedition Mission">
               <select className={inputCls} value={form.expeditionId} onChange={e => setForm({ ...form, expeditionId: e.target.value })}>
                 {exps.map(x => <option key={x._id} value={x._id}>{x.expeditionCode}</option>)}
               </select>
             </Field>
-            <button className={btnPrimary}>Register</button>
+            <Field label="Itemized Manifest (e.g. Arctic Rations: 300 Kilograms, Freeze Dried Meals: 150 Units)">
+              <textarea
+                className={inputCls}
+                rows={2}
+                placeholder="ItemName: Quantity Unit, AnotherItem: Quantity Unit"
+                value={form.itemsText}
+                onChange={e => setForm({ ...form, itemsText: e.target.value })}
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={form.isHazmat}
+                onChange={e => setForm({ ...form, isHazmat: e.target.checked })}
+                className="rounded border-slate-300"
+              />
+              ⚠️ Classify as Hazardous Material (Hazmat / Fuel / Cold Chain Lithium)
+            </label>
+            <button className={btnPrimary}>Register Cargo Manifest</button>
           </form>
         </Modal>
       )}
@@ -235,13 +301,32 @@ export default function Cargo() {
       {receiveCargo && (
         <Modal title={`Receive ${receiveCargo.trackingNumber}`} onClose={() => setReceiveCargo(null)}>
           <form onSubmit={doReceive} className="flex flex-col gap-3">
-            <p className="text-sm text-slate-500">Station receipt adds cargo items to inventory with RECEIPT transactions.</p>
-            <Field label="Receiving station">
+            <p className="text-sm text-slate-500">
+              Station receipt unpacks these items directly into the station's live inventory with official verified <b>RECEIPT</b> ledger transactions.
+            </p>
+            {receiveCargo.items && receiveCargo.items.length > 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+                <p className="font-bold text-slate-700 dark:text-slate-200">📦 Manifest items being unpacked:</p>
+                <ul className="mt-1.5 space-y-1">
+                  {receiveCargo.items.map((it, idx) => (
+                    <li key={idx} className="flex justify-between border-b border-slate-200/60 pb-0.5 last:border-0 dark:border-slate-700">
+                      <span>{it.name}</span>
+                      <span className="font-semibold text-cyan-600 dark:text-cyan-400">{it.quantity} {it.unit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
+                Will unpack as: <b>{receiveCargo.title}</b> ({receiveCargo.weightKg || 10} Units)
+              </div>
+            )}
+            <Field label="Receiving Station Bunkers">
               <select className={inputCls} value={receiveStation} onChange={e => setReceiveStation(e.target.value)}>
                 <option>Bharati</option><option>Maitri</option><option>Himadri</option>
               </select>
             </Field>
-            <button className={btnPrimary}>Confirm receipt</button>
+            <button className={btnPrimary}>Confirm Receipt & Unpack to Inventory</button>
           </form>
         </Modal>
       )}

@@ -16,7 +16,15 @@ export default function Personnel() {
   const [locOptions, setLocOptions] = useState(FALLBACK_LOCATIONS);
   const [loading, setLoading] = useState(true);
   const [checkId, setCheckId] = useState(null);
-  const [checkForm, setCheckForm] = useState({ status: 'StationHab', location: '', lat: '', lng: '' });
+  const [checkForm, setCheckForm] = useState({
+    status: 'StationHab',
+    location: '',
+    lat: '',
+    lng: '',
+    heartRate: '',
+    bodyTempC: '',
+    expectedReturn: ''
+  });
   const [showDeploy, setShowDeploy] = useState(false);
   const [depForm, setDepForm] = useState({ expeditionId: '', userId: '', badgeId: '', roleTitle: '', currentLocation: 'Maitri Station' });
   const [error, setError] = useState('');
@@ -55,7 +63,15 @@ export default function Personnel() {
 
   const openCheckin = (p) => {
     setCheckId(p._id);
-    setCheckForm({ status: p.currentStatus, location: p.currentLocation || '', lat: '', lng: '' });
+    setCheckForm({
+      status: p.currentStatus,
+      location: p.currentLocation || '',
+      lat: p.currentCoordinates?.lat || '',
+      lng: p.currentCoordinates?.lng || '',
+      heartRate: p.vitals?.heartRate || '',
+      bodyTempC: p.vitals?.bodyTempC || '',
+      expectedReturn: p.expectedReturn ? p.expectedReturn.slice(0, 16) : ''
+    });
   };
 
   const doCheckin = async (e) => {
@@ -67,7 +83,10 @@ export default function Personnel() {
         badgeId: p.badgeId,
         status: checkForm.status,
         location: checkForm.location,
-        ...(checkForm.lat && checkForm.lng ? { lat: Number(checkForm.lat), lng: Number(checkForm.lng) } : {})
+        ...(checkForm.lat && checkForm.lng ? { lat: Number(checkForm.lat), lng: Number(checkForm.lng) } : {}),
+        ...(checkForm.heartRate ? { heartRate: Number(checkForm.heartRate) } : {}),
+        ...(checkForm.bodyTempC ? { bodyTempC: Number(checkForm.bodyTempC) } : {}),
+        ...(checkForm.expectedReturn ? { expectedReturn: checkForm.expectedReturn } : {})
       }
     });
     setCheckId(null); load();
@@ -171,13 +190,32 @@ export default function Personnel() {
       <Card className="p-0">
         <TableWrap>
           <table className="w-full">
-            <thead><tr><Th>Badge</Th><Th>Name</Th><Th>Status</Th><Th>Location</Th><Th>Last check-in</Th><Th>Action</Th></tr></thead>
+            <thead>
+              <tr>
+                <Th>Badge</Th>
+                <Th>Name</Th>
+                <Th>Status</Th>
+                <Th>Vitals (Pulse/Temp)</Th>
+                <Th>Location</Th>
+                <Th>Last check-in</Th>
+                <Th>Action</Th>
+              </tr>
+            </thead>
             <tbody>
               {list.map(p => (
                 <tr key={p._id} className="border-t border-slate-100 dark:border-slate-800">
-                  <Td>{p.badgeId}</Td>
+                  <Td className="font-mono text-xs font-bold">{p.badgeId}</Td>
                   <Td>{p.userId?.fullName || p.userId?.username}</Td>
                   <Td><Pill value={p.currentStatus} /></Td>
+                  <Td>
+                    <div className="flex flex-col text-xs leading-tight">
+                      <span className="font-semibold text-rose-500">❤️ {p.vitals?.heartRate ? `${p.vitals.heartRate} bpm` : '—'}</span>
+                      <span className={`${p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 ? 'text-amber-500 font-bold' : 'text-slate-500 dark:text-slate-400'}`}>
+                        🌡️ {p.vitals?.bodyTempC ? `${p.vitals.bodyTempC}°C` : '—'}
+                        {p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 && ' ⚠️ Low'}
+                      </span>
+                    </div>
+                  </Td>
                   <Td>{p.currentLocation || '—'}</Td>
                   <Td>{p.lastCheckIn ? new Date(p.lastCheckIn).toLocaleString() : '—'}</Td>
                   <Td>
@@ -199,24 +237,53 @@ export default function Personnel() {
       </Card>
 
       {checkId && (
-        <Modal title="Check-in — kahan se?" onClose={() => setCheckId(null)}>
+        <Modal title="Daily Field Check-in & Health Clearance" onClose={() => setCheckId(null)}>
           <form onSubmit={doCheckin} className="flex flex-col gap-3">
-            <Field label="Status">
+            <Field label="Status / Field Phase">
               <select className={inputCls} value={checkForm.status} onChange={e => setCheckForm({ ...checkForm, status: e.target.value })}>
                 {STATUSES.map(s => <option key={s}>{s}</option>)}
               </select>
             </Field>
-            <Field label="Current location (live from Locations)">
+            <Field label="Current Location (live from Base Stations & Camps)">
               <select className={inputCls} value={checkForm.location} onChange={e => setCheckForm({ ...checkForm, location: e.target.value })}>
                 <option value="">— select —</option>
                 {locOptions.map(l => <option key={l}>{l}</option>)}
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
+              <Field label="Pulse / Heart Rate (BPM)">
+                <input
+                  type="number"
+                  className={inputCls}
+                  placeholder="e.g. 72"
+                  value={checkForm.heartRate}
+                  onChange={e => setCheckForm({ ...checkForm, heartRate: e.target.value })}
+                />
+              </Field>
+              <Field label="Body Temp (°C)">
+                <input
+                  type="number"
+                  step="0.1"
+                  className={inputCls}
+                  placeholder="e.g. 36.6"
+                  value={checkForm.bodyTempC}
+                  onChange={e => setCheckForm({ ...checkForm, bodyTempC: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <Field label="Lat (optional)"><input className={inputCls} value={checkForm.lat} onChange={e => setCheckForm({ ...checkForm, lat: e.target.value })} placeholder="-70.77" /></Field>
               <Field label="Lng (optional)"><input className={inputCls} value={checkForm.lng} onChange={e => setCheckForm({ ...checkForm, lng: e.target.value })} placeholder="11.73" /></Field>
             </div>
-            <button className={btnPrimary}>Check-in now</button>
+            <Field label="Expected Return to Habitat">
+              <input
+                type="datetime-local"
+                className={inputCls}
+                value={checkForm.expectedReturn}
+                onChange={e => setCheckForm({ ...checkForm, expectedReturn: e.target.value })}
+              />
+            </Field>
+            <button className={btnPrimary}>Submit Check-in & Vitals</button>
           </form>
         </Modal>
       )}

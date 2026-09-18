@@ -45,9 +45,9 @@ router.post('/', async (req, res) => {
   } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
 
-// POST /api/v1/personnel/checkin — resets dead-man countdown + records WHERE from
+// POST /api/v1/personnel/checkin — resets dead-man countdown + records WHERE from + vitals
 router.post('/checkin', async (req, res) => {
-  const { personnelId, badgeId, status, location, lat, lng, expectedReturn } = req.body || {};
+  const { personnelId, badgeId, status, location, lat, lng, expectedReturn, bodyTempC, heartRate } = req.body || {};
   const query = personnelId ? { _id: personnelId } : badgeId ? { badgeId } : null;
   if (!query) return res.status(400).json({ error: 'personnelId or badgeId required' });
   const p = await Personnel.findOne(query);
@@ -64,6 +64,15 @@ router.post('/checkin', async (req, res) => {
     };
   } else if (p.currentCoordinates) p.currentCoordinates.lastPing = new Date();
   else p.currentCoordinates = { lastPing: new Date() };
+
+  // Record vitals (pulse / body temperature)
+  if (heartRate !== undefined || bodyTempC !== undefined) {
+    p.vitals = {
+      ...(p.vitals?.toObject?.() || {}),
+      heartRate: heartRate !== undefined && heartRate !== '' ? Number(heartRate) : p.vitals?.heartRate,
+      bodyTempC: bodyTempC !== undefined && bodyTempC !== '' ? Number(bodyTempC) : p.vitals?.bodyTempC
+    };
+  }
   await p.save();
   // Movement history: record when location actually changes (#21)
   if (location && location !== fromLocation) {

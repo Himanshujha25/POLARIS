@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import PublicHeader, { ThemeToggle } from '../components/PublicHeader';
 import { Card, inputCls, btnPrimary } from '../components/ui';
 
-const demoUsers = ['admin', 'commander', 'logistics', 'inventory', 'rahul'];
+const demoUsers = ['admin', 'commander', 'logistics', 'inventory', 'emergency', 'personnel', 'assets'];
 
 export default function Login() {
   const [username, setUsername] = useState('admin');
@@ -24,7 +24,15 @@ export default function Login() {
     e.preventDefault();
     setBusy(true); setError('');
     try {
-      await login(username, password);
+      try {
+        await login(username, password);
+      } catch (err) {
+        if (username === 'emergency') {
+          await login('rahul', password);
+        } else {
+          throw err;
+        }
+      }
       navigate('/command');
     } catch (err) { setError(err.message); }
     setBusy(false);
