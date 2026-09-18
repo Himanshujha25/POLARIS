@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Rocket, Package, Boxes, Users, Siren,
-  Radar, Satellite, Fuel, BellRing, ShieldCheck, Map as MapIcon, Radio
+  Radar, Satellite, Fuel, BellRing, ShieldCheck, Map as MapIcon, Snowflake, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import PublicHeader, { ThemeToggle } from '../components/PublicHeader';
@@ -62,9 +62,6 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-4 pb-10 pt-12 text-center sm:pt-20">
-        <p className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-600 dark:text-cyan-300">
-          <Radio size={14} /> SIH 2026 · PS 26062 · MoES / NCPOR
-        </p>
         <h1 className="mx-auto max-w-3xl text-3xl font-extrabold leading-tight sm:text-5xl">
           Mission control for India's <span className="text-cyan-500">polar expeditions</span>
         </h1>
@@ -96,13 +93,13 @@ export default function Landing() {
         <h2 className="text-center text-xl font-extrabold sm:text-2xl">Five modules. One expedition ERP.</h2>
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {modules.map(m => (
-            <div key={m.title} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[#111a2e]">
+            <div key={m.title} className="rounded-xl border border-slate-200 bg-white p-4 transition-shadow duration-200 hover:shadow-md dark:border-slate-800 dark:bg-[#111a2e]">
               <m.icon className="text-cyan-500" size={24} />
               <p className="mt-2 font-bold">{m.title}</p>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{m.text}</p>
             </div>
           ))}
-          <div className="rounded-xl border border-dashed border-cyan-500/50 bg-cyan-500/5 p-4">
+          <div className="rounded-xl border border-dashed border-cyan-500/50 bg-cyan-500/5 p-4 transition-shadow duration-200 hover:shadow-md">
             <MapIcon className="text-cyan-500" size={24} />
             <p className="mt-2 font-bold">+ Live Polar Map</p>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Stations, field parties and hazard polygons tracked in real time.</p>
@@ -119,13 +116,13 @@ export default function Landing() {
           </p>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {engines.map(m => (
-              <div key={m.title} className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
+              <div key={m.title} className="rounded-xl bg-slate-50 p-4 transition-shadow duration-200 hover:shadow-md dark:bg-slate-800/50">
                 <m.icon className="text-amber-500" size={24} />
                 <p className="mt-2 font-bold">{m.title}</p>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{m.text}</p>
               </div>
             ))}
-            <div className="rounded-xl bg-red-500/10 p-4">
+            <div className="rounded-xl bg-red-500/10 p-4 transition-shadow duration-200 hover:shadow-md">
               <Siren className="text-red-500" size={24} />
               <p className="mt-2 font-bold">SOS Broadcast</p>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Disaster-severity alerts pushed live to every command screen via WebSocket.</p>
@@ -135,9 +132,44 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-        <p className="font-bold text-slate-700 dark:text-slate-200">POLARIS · NCPOR / Ministry of Earth Sciences</p>
-        <p className="mt-1">React 19 · Node.js · MongoDB Atlas · Socket.IO · Leaflet · Tailwind</p>
+      <footer className="border-t border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-[#09101c]">
+        <div className="mx-auto max-w-6xl px-4 py-10">
+          <div className="grid gap-8 sm:grid-cols-[1.5fr_1fr_1fr]">
+            <div>
+              <Link to="/" className="flex items-center gap-2 text-slate-900 dark:text-white">
+                <Snowflake className="text-cyan-500" size={22} />
+                <span className="font-extrabold tracking-wide">POLARIS</span>
+              </Link>
+              <p className="mt-3 max-w-sm text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Coordinating safer, smarter Indian polar expeditions from Goa HQ to the ice.
+              </p>
+              <p className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <span className={`h-2 w-2 rounded-full ${health === 'online' ? 'bg-emerald-500' : health === 'offline' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                {health === 'online' ? 'Mission systems operational' : health === 'offline' ? 'Mission systems offline' : 'Checking mission systems'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">Explore</p>
+              <div className="mt-3 flex flex-col items-start gap-2 text-sm text-slate-500 dark:text-slate-400">
+                <a href="#modules" className="hover:text-cyan-500">Platform modules</a>
+                <a href="#automation" className="hover:text-cyan-500">Automation engines</a>
+                <Link to={user ? '/command' : '/login'} className="inline-flex items-center gap-1 hover:text-cyan-500">
+                  {user ? 'Open command' : 'Sign in'} <ExternalLink size={13} />
+                </Link>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">Built for the ice</p>
+              <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Expedition safety · logistics · response
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 flex flex-col gap-2 border-t border-slate-200 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <p>© 2026 POLARIS Mission Control</p>
+            <p>React · Node.js · MongoDB Atlas · Socket.IO · Leaflet</p>
+          </div>
+        </div>
       </footer>
     </div>
   );
