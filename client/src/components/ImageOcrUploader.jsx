@@ -400,7 +400,7 @@ export default function ImageOcrUploader({
 
       {/* Upload Dropzone / Preview */}
       {!imageUrl ? (
-        <label
+        <div
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onDrop={(e) => {
             e.preventDefault();
@@ -408,7 +408,7 @@ export default function ImageOcrUploader({
             const file = e.dataTransfer.files?.[0];
             if (file) processImageFile(file);
           }}
-          className="cursor-pointer border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-cyan-500 dark:hover:border-cyan-400 rounded-lg p-5 flex flex-col items-center justify-center text-center transition-colors bg-white/50 dark:bg-slate-800/30 group"
+          className="relative cursor-pointer border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-cyan-500 dark:hover:border-cyan-400 rounded-lg p-5 flex flex-col items-center justify-center text-center transition-colors bg-white/50 dark:bg-slate-800/30 group"
         >
           <div className="w-10 h-10 rounded-full bg-cyan-500/10 text-cyan-500 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all flex items-center justify-center mb-1.5 pointer-events-none">
             <Upload size={18} />
@@ -425,10 +425,10 @@ export default function ImageOcrUploader({
           <input
             type="file"
             accept="image/*,.png,.jpg,.jpeg,.webp"
-            className="hidden"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             onChange={handleFileSelect}
           />
-        </label>
+        </div>
       ) : (
         <div className="flex flex-col sm:flex-row gap-3 items-start">
           <div className="relative group shrink-0 w-32 h-24 rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700 bg-black/10">

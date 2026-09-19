@@ -35,7 +35,6 @@ const DEFAULT_LOCATIONS = [
 export default function Incidents() {
   const { user } = useAuth();
   const [list, setList] = useState([]);
-<<<<<<< HEAD
   const [exps, setExps] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [allAssets, setAllAssets] = useState([]);
@@ -54,27 +53,11 @@ export default function Incidents() {
     responderIds: [],
     affectedAssetIds: [],
     affectedPersonnelIds: []
-=======
-  const [users, setUsers] = useState([]);
-  const [assets, setAssets] = useState([]);
-  const [locations, setLocations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showActive, setShowActive] = useState(true);
-  const [show, setShow] = useState(false);
-  const [form, setForm] = useState({
-    type: 'Medical',
-    severity: 'High',
-    location: '',
-    description: '',
-    responderIds: [],
-    affectedAssetIds: []
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
   });
 
   const canCreate = ['SuperAdmin', 'ExpeditionManager', 'EmergencyOfficer'].includes(user?.role);
 
   const load = async () => {
-<<<<<<< HEAD
     try {
       const [incidents, expeditions, u, assets, personnel] = await Promise.all([
         api(`/api/v1/incidents${showActive ? '?active=true' : ''}`),
@@ -92,20 +75,6 @@ export default function Incidents() {
       if (expeditions?.length > 0 && !form.expeditionId) {
         setForm(f => ({ ...f, expeditionId: expeditions[0]._id }));
       }
-=======
-    setLoading(true);
-    try {
-      const [incList, uList, aList, locList] = await Promise.all([
-        api(`/api/v1/incidents${showActive ? '?active=true' : ''}`),
-        api('/api/v1/auth/users').catch(() => []),
-        api('/api/v1/assets').catch(() => []),
-        api('/api/v1/locations').catch(() => [])
-      ]);
-      setList(incList);
-      setUsers(Array.isArray(uList) ? uList : []);
-      setAssets(Array.isArray(aList) ? aList : []);
-      setLocations(Array.isArray(locList) ? locList.map(l => l.name) : []);
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
     } catch { /* ignore */ }
     setLoading(false);
   };
@@ -117,11 +86,7 @@ export default function Incidents() {
     setForm(f => ({
       ...f,
       responderIds: f.responderIds.includes(uid)
-<<<<<<< HEAD
         ? f.responderIds.filter(id => id !== uid)
-=======
-        ? f.responderIds.filter(x => x !== uid)
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
         : [...f.responderIds, uid]
     }));
   };
@@ -130,16 +95,11 @@ export default function Incidents() {
     setForm(f => ({
       ...f,
       affectedAssetIds: f.affectedAssetIds.includes(aid)
-<<<<<<< HEAD
         ? f.affectedAssetIds.filter(id => id !== aid)
-=======
-        ? f.affectedAssetIds.filter(x => x !== aid)
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
         : [...f.affectedAssetIds, aid]
     }));
   };
 
-<<<<<<< HEAD
   const togglePersonnel = (pid) => {
     setForm(f => ({
       ...f,
@@ -187,15 +147,6 @@ export default function Incidents() {
     } catch (err) {
       alert('Error creating incident: ' + (err.message || 'Server error'));
     }
-=======
-  const create = async (e) => {
-    e.preventDefault();
-    const res = await api('/api/v1/incidents', { method: 'POST', body: form });
-    alert(res.autoRollCall ? `Incident created + auto roll-call: ${res.autoRollCall} people at location` : 'Incident created');
-    setShow(false);
-    setForm({ type: 'Medical', severity: 'High', location: '', description: '', responderIds: [], affectedAssetIds: [] });
-    load();
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
   };
 
   if (loading) return <Spinner />;
@@ -331,8 +282,6 @@ export default function Incidents() {
                 </select>
               </Field>
             </div>
-<<<<<<< HEAD
-
             {/* Direct Location Picker */}
             <div className="flex flex-col gap-1.5">
               <Field label="Location / Station / Field Sector">
@@ -380,53 +329,10 @@ export default function Incidents() {
                 {allUsers.map(u => {
                   const isSelected = form.responderIds.includes(u._id);
                   return (
-=======
-            <Field label="Location (Base Station / Field Camp)">
-              <div className="flex flex-col gap-1.5">
-                {locations.length > 0 && (
-                  <select
-                    className={inputCls}
-                    value={locations.includes(form.location) ? form.location : ''}
-                    onChange={e => setForm({ ...form, location: e.target.value })}
-                  >
-                    <option value="">— select from known bases/stations —</option>
-                    {locations.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                )}
-                <input
-                  className={inputCls}
-                  required
-                  value={form.location}
-                  onChange={e => setForm({ ...form, location: e.target.value })}
-                  placeholder="Or enter coordinates/field sector: e.g. Crevasse Zone East"
-                />
-              </div>
-            </Field>
-
-            <Field label="Description & Nature of Hazard">
-              <textarea
-                className={inputCls}
-                rows={2}
-                required
-                value={form.description}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-                placeholder="Describe injuries, vehicle status, blizzard conditions..."
-              />
-            </Field>
-
-            {users.length > 0 && (
-              <div>
-                <p className="mb-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Assign Immediate Responders ({form.responderIds.length} selected):
-                </p>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto rounded-lg border border-slate-200 p-1.5 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
-                  {users.map(u => (
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
                     <button
                       key={u._id}
                       type="button"
                       onClick={() => toggleResponder(u._id)}
-<<<<<<< HEAD
                       className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 ${
                         isSelected
                           ? 'border-cyan-500 bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 font-bold'
@@ -456,33 +362,10 @@ export default function Incidents() {
                 {allAssets.map(a => {
                   const isSelected = form.affectedAssetIds.includes(a._id);
                   return (
-=======
-                      className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
-                        form.responderIds.includes(u._id)
-                          ? 'border-red-500 bg-red-500/10 text-red-600 dark:text-red-400 font-bold'
-                          : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      {form.responderIds.includes(u._id) ? '✓ ' : '+ '}{u.fullName} ({u.role})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {assets.length > 0 && (
-              <div>
-                <p className="mb-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Deploy Rescue Vehicles & Machinery ({form.affectedAssetIds.length} selected):
-                </p>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto rounded-lg border border-slate-200 p-1.5 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
-                  {assets.map(a => (
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
                     <button
                       key={a._id}
                       type="button"
                       onClick={() => toggleAsset(a._id)}
-<<<<<<< HEAD
                       className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 ${
                         isSelected
                           ? 'border-amber-500 bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold'
@@ -536,22 +419,6 @@ export default function Incidents() {
             <button type="submit" className={`${btnDanger} w-full py-2 font-bold mt-1 text-xs uppercase tracking-wider`}>
               Transmit Emergency Distress & Activate Roll-Call
             </button>
-=======
-                      className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
-                        form.affectedAssetIds.includes(a._id)
-                          ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold'
-                          : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      {form.affectedAssetIds.includes(a._id) ? '✓ ' : '+ '}{a.assetTag} · {a.name} ({a.condition})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <button className={btnPrimary}>Create Emergency Incident + Auto Roll-Call</button>
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
           </form>
         </Modal>
       )}

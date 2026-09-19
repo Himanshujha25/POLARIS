@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
-<<<<<<< HEAD
-import { Search, Biohazard, Printer, Box, ShieldCheck, Package, ScanLine } from 'lucide-react';
-=======
-import { Search, QrCode, ShieldAlert, Printer } from 'lucide-react';
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
+import { Search, Biohazard, Printer, Box, ShieldCheck, Package, ScanLine, QrCode, ShieldAlert } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
-<<<<<<< HEAD
 import ContainerLabelModal from '../components/ContainerLabelModal';
 import ImageOcrUploader from '../components/ImageOcrUploader';
-=======
 import { generateLogisticsCodeSVG } from '../lib/qrCode';
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
 
 const NODES = ['NCPOR_Goa', 'Mumbai_Port', 'Cape_Town_Hub', 'Research_Vessel', 'Ice_Shelf_Barrier', 'Bharati_Station', 'Maitri_Station'];
 
@@ -34,22 +27,15 @@ export default function Cargo() {
     title: '',
     category: 'Provisions',
     weightKg: 100,
-    tareWeightKg: '',
+    tareWeightKg: 2200,
     expeditionId: '',
     isHazmat: false,
-<<<<<<< HEAD
-    containerNumber: '',
-    sealNumber: '',
+    hazmatClass: '',
+    customsDeclarationNumber: '',
     containerType: '20ft_Standard',
-    tareWeightKg: 2200,
     itemsText: '',
     imageUrl: '',
     ocrExtractedText: ''
-=======
-    hazmatClass: '',
-    customsDeclarationNumber: '',
-    itemsText: ''
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
   });
   const [printCargo, setPrintCargo] = useState(null);
   const [timeline, setTimeline] = useState(null);
@@ -274,7 +260,6 @@ export default function Cargo() {
               </div>
               <Pill value={c.status} />
             </div>
-<<<<<<< HEAD
             <div className="flex flex-wrap items-center gap-2 text-sm mt-0.5">
               <span className="font-semibold text-slate-800 dark:text-slate-200">{c.title}</span>
               <span className="text-slate-400">•</span>
@@ -285,30 +270,15 @@ export default function Cargo() {
                   title="Hazardous Materials (HAZMAT: Class 3 Fuel, Lithium, Cryogenics)"
                 >
                   <Biohazard size={13} className="text-amber-500 shrink-0" />
-                  <span>HAZMAT</span>
+                  <span>HAZMAT {c.hazmatClass ? `(${c.hazmatClass})` : ''}</span>
                 </span>
               )}
             </div>
-=======
-
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-              <span className="font-medium">{c.title}</span>
-              <span>·</span>
-              <span>{c.weightKg} kg</span>
-              {c.isHazmat && (
-                <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-400">
-                  <ShieldAlert size={12} /> HAZMAT {c.hazmatClass ? `(${c.hazmatClass})` : ''}
-                </span>
-              )}
-            </div>
-
             {c.customsDeclarationNumber && (
               <p className="mt-0.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
                 Customs Ref: {c.customsDeclarationNumber}
               </p>
             )}
-
->>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
             {c.items && c.items.length > 0 && (
               <div className="mt-1.5 rounded bg-slate-50 p-2 text-xs dark:bg-slate-800/40">
                 <p className="font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -393,7 +363,6 @@ export default function Cargo() {
       {showCreate && (
         <Modal title="Register ISO Container & Cargo Manifest" onClose={() => setShowCreate(false)}>
           <form onSubmit={create} className="flex flex-col gap-3">
-<<<<<<< HEAD
             <Field label="Tracking Number / QR">
               <input
                 className={inputCls}
