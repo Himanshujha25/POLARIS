@@ -2,6 +2,16 @@
 **Date:** 17 Sep 2026 · **Audited against:** `SIH26062_Polar_Expedition_AI_Agent_Master_PRD.md` (52 sections) + docs/01–05
 **Verified:** 45/45 backend smoke tests pass · client `npm run build` passes
 
+> **Live-hardening update (19 Sep 2026):** hardcoded fallbacks removed —
+> `Personnel.jsx` location dropdowns are 100% API-driven with empty-states
+> (no `FALLBACK_LOCATIONS`); `QuickDemoBar` legacy `rahul` fallback removed;
+> map stations + danger zones are DB-driven (`GET /locations/map`,
+> `Location.dangerPolygon`, base geography auto-seeded, geofence reads DB
+> with code constants as fallback only); zod validation on all write APIs
+> (400 + field details); morgan request logs; self-service password change
+> (`PATCH /auth/password` + Layout modal). Live-probed against Atlas:
+> health ok, validation 400s correct, map returns 6 stations + 2 zones.
+
 ---
 
 ## 1. What is built (module-wise)

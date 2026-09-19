@@ -34,4 +34,30 @@ function checkGeofence(lat, lng) {
   return null;
 }
 
-module.exports = { DANGER_ZONES, pointInPolygon, checkGeofence };
+// DB-driven zones: Location docs carrying dangerPolygon win over the
+// code constants. Falls back to DANGER_ZONES only when DB has none
+// (fresh database before base seeding).
+let LocationModel = null;
+async function getDangerZones() {
+  try {
+    if (!LocationModel) LocationModel = require('../models/Location');
+    const docs = await LocationModel.find({ dangerPolygon: { $exists: true, $ne: [] } })
+      .select('name dangerPolygon').limit(100);
+    const dbZones = docs
+      .filter(d => Array.isArray(d.dangerPolygon) && d.dangerPolygon.length >= 3)
+      .map(d => ({ name: d.name, polygon: d.dangerPolygon }));
+    return dbZones.length ? dbZones : DANGER_ZONES;
+  } catch {
+    return DANGER_ZONES;
+  }
+}
+
+async function checkGeofenceAsync(lat, lng) {
+  const zones = await getDangerZones();
+  for (const zone of zones) {
+    if (pointInPolygon(lat, lng, zone.polygon)) return zone.name;
+  }
+  return null;
+}
+
+module.exports = { DANGER_ZONES, pointInPolygon, checkGeofence, getDangerZones, checkGeofenceAsync };

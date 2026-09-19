@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Rocket, Package, Boxes, Users, Wrench, Map as MapIcon,
-  Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog,
+  Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog, KeyRound,
   MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon, Radio
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { api } from '../lib/api';
+import { Modal, Field, inputCls, btnPrimary } from './ui';
 import SearchBox from './SearchBox';
 import QuickDemoBar from './QuickDemoBar';
 
@@ -60,8 +62,22 @@ export default function Layout({ children }) {
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const [showFeed, setShowFeed] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
+  const [pwMsg, setPwMsg] = useState('');
 
   const doLogout = () => { logout(); navigate('/'); };
+
+  const changePassword = async (e) => {
+    e.preventDefault();
+    setPwMsg('');
+    if (pwForm.newPassword !== pwForm.confirm) { setPwMsg('New passwords do not match'); return; }
+    try {
+      await api('/api/v1/auth/password', { method: 'PATCH', body: { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword } });
+      setShowPw(false);
+      setPwForm({ currentPassword: '', newPassword: '', confirm: '' });
+    } catch (err) { setPwMsg(err.message); }
+  };
   const allLinks = navSections.flatMap(s => s.links).filter(l => l.roles.includes(user?.role));
 
   return (
@@ -101,8 +117,23 @@ export default function Layout({ children }) {
           <button onClick={doLogout} className="mt-2 flex items-center gap-1 font-medium text-red-500">
             <LogOut size={14} /> Logout
           </button>
+          <button onClick={() => { setShowPw(true); setPwMsg(''); }} className="mt-1.5 flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
+            <KeyRound size={14} /> Change password
+          </button>
         </div>
       </aside>
+
+      {showPw && (
+        <Modal title="Change password" onClose={() => setShowPw(false)}>
+          <form onSubmit={changePassword} className="flex flex-col gap-3">
+            <Field label="Current password"><input type="password" className={inputCls} required value={pwForm.currentPassword} onChange={e => setPwForm({ ...pwForm, currentPassword: e.target.value })} /></Field>
+            <Field label="New password (min 8 chars)"><input type="password" className={inputCls} required minLength={8} value={pwForm.newPassword} onChange={e => setPwForm({ ...pwForm, newPassword: e.target.value })} /></Field>
+            <Field label="Confirm new password"><input type="password" className={inputCls} required value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} /></Field>
+            {pwMsg && <p className="text-sm text-red-500">{pwMsg}</p>}
+            <button className={btnPrimary}>Update password</button>
+          </form>
+        </Modal>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top header */}

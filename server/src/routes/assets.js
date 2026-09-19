@@ -2,6 +2,7 @@ const express = require('express');
 const Asset = require('../models/Asset');
 const MaintenanceLog = require('../models/MaintenanceLog');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 
 const router = express.Router();
 router.use(authRequired);
@@ -17,13 +18,13 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/assets
-router.post('/', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), async (req, res) => {
+router.post('/', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), validate(schemas.assetCreate), async (req, res) => {
   try { res.status(201).json(await Asset.create(req.body)); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // PATCH /api/v1/assets/:id/telemetry
-router.patch('/:id/telemetry', async (req, res) => {
+router.patch('/:id/telemetry', validate(schemas.assetTelemetry), async (req, res) => {
   const asset = await Asset.findById(req.params.id);
   if (!asset) return res.status(404).json({ error: 'Not found' });
   const { operatingHours, engineTempC, vibrationLevel, fuelLevelPercent, oilPressurePsi, condition } = req.body || {};
@@ -43,7 +44,7 @@ router.patch('/:id/telemetry', async (req, res) => {
 });
 
 // PATCH /api/v1/assets/:id — edit master data
-router.patch('/:id', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), async (req, res) => {
+router.patch('/:id', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), validate(schemas.assetUpdate), async (req, res) => {
   const asset = await Asset.findById(req.params.id);
   if (!asset) return res.status(404).json({ error: 'Not found' });
   ['name', 'station', 'type', 'condition', 'maxHoursBeforeService', 'assignedToPersonnelId', 'expeditionId'].forEach(f => {
@@ -64,7 +65,7 @@ router.delete('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (re
 });
 
 // POST /api/v1/assets/:id/maintenance
-router.post('/:id/maintenance', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), async (req, res) => {
+router.post('/:id/maintenance', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), validate(schemas.assetMaintenance), async (req, res) => {
   const asset = await Asset.findById(req.params.id);
   if (!asset) return res.status(404).json({ error: 'Not found' });
   const { description, partsUsed } = req.body || {};

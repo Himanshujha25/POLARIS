@@ -5,11 +5,12 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
+const morgan = require('morgan');
 const { Server } = require('socket.io');
 
 const connectDB = require('./config/db');
 const { startAutomation } = require('./services/automation');
-const { seedDefaultUsers } = require('./utils/seed');
+const { seedDefaultUsers, seedBaseLocations } = require('./utils/seed');
 
 const app = express();
 app.use(helmet());
@@ -19,6 +20,10 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '200kb' }));
 app.use(mongoSanitize());
+// HTTP request log: method, url, status, latency. Skips noisy health polls.
+app.use(morgan('[:date[iso]] :method :url :status :response-time ms', {
+  skip: (req) => req.path === '/api/v1/health'
+}));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
 
 app.get('/api/v1/health', (req, res) => {
@@ -60,6 +65,7 @@ const PORT = process.env.PORT || 5000;
 async function start() {
   await connectDB();
   await seedDefaultUsers().catch(e => console.warn('[seed] notice:', e.message));
+  await seedBaseLocations().catch(e => console.warn('[seed] locations notice:', e.message));
   startAutomation(io, 60000);
   server.listen(PORT, () => console.log(`[server] POLARIS backend on :${PORT}`));
 }

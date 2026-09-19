@@ -29,16 +29,9 @@ export default function QuickDemoBar() {
     setSwitching(true);
     setOpen(false);
     try {
-      try {
-        await login(p.username, 'Test@123');
-      } catch (err) {
-        // Transparent fallback to legacy test username if emergency account hasn't been reseeded yet
-        if (p.username === 'emergency') {
-          await login('rahul', 'Test@123');
-        } else {
-          throw err;
-        }
-      }
+      // Each persona is a real deployment account in the database (seeded).
+      // No test-username fallbacks: if login fails the error surfaces honestly.
+      await login(p.username, 'Test@123');
       navigate('/command');
     } catch (err) {
       console.error('Failed role switch:', err);
@@ -74,7 +67,7 @@ export default function QuickDemoBar() {
           </div>
           <div className="mt-1 flex flex-col gap-1">
             {OFFICIAL_PERSONAS.map(p => {
-              const active = user?.username === p.username || (p.username === 'emergency' && user?.username === 'rahul');
+              const active = user?.username === p.username;
               return (
                 <button
                   key={p.username}

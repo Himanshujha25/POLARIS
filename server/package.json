@@ -21,6 +21,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb-memory-server": "^10.1.2",
     "mongoose": "^8.5.0",
-    "socket.io": "^4.7.5"
+    "morgan": "^1.12.1",
+    "socket.io": "^4.7.5",
+    "zod": "^4.6.5"
   }
 }

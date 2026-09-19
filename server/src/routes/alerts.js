@@ -2,6 +2,7 @@ const express = require('express');
 const Alert = require('../models/Alert');
 const Personnel = require('../models/Personnel');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { runAllChecks } = require('../services/automation');
 
 const router = express.Router();
@@ -23,7 +24,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/alerts/sos — emergency beacon
-router.post('/sos', async (req, res) => {
+router.post('/sos', validate(schemas.sos), async (req, res) => {
   const { personnelId, badgeId, expeditionId, message, lat, lng } = req.body || {};
   let personnel = null;
   if (personnelId || badgeId) {
@@ -61,7 +62,7 @@ router.patch('/:id/acknowledge', requireRoles('SuperAdmin', 'ExpeditionManager',
 });
 
 // POST /api/v1/alerts/simulate-telemetry — SIH demo harness
-router.post('/simulate-telemetry', async (req, res) => {
+router.post('/simulate-telemetry', validate(schemas.simulateTelemetry), async (req, res) => {
   const { scenario } = req.body || {};
   const PersonnelModel = require('../models/Personnel');
   const Inventory = require('../models/Inventory');

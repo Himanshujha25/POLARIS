@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
@@ -16,7 +17,7 @@ function signToken(user) {
 }
 
 // POST /api/v1/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', validate(schemas.login), async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'username and password required' });
   const user = await User.findOne({ $or: [{ username }, { email: username }] });
@@ -59,7 +60,7 @@ router.patch('/users/:id', authRequired, requireRoles('SuperAdmin'), async (req,
 });
 
 // POST /api/v1/auth/register (SuperAdmin only)
-router.post('/register', authRequired, requireRoles('SuperAdmin'), async (req, res) => {
+router.post('/register', authRequired, requireRoles('SuperAdmin'), validate(schemas.register), async (req, res) => {
   const { username, email, password, fullName, role, station, bloodGroup, emergencyContact } = req.body || {};
   if (!username || !email || !password || !fullName || !role) {
     return res.status(400).json({ error: 'username, email, password, fullName, role required' });
@@ -73,6 +74,19 @@ router.post('/register', authRequired, requireRoles('SuperAdmin'), async (req, r
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
+});
+
+// PATCH /api/v1/auth/password — self-service password change.
+// Requires the current password so a stolen session alone is not enough.
+router.patch('/password', authRequired, validate(schemas.passwordChange), async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const ok = await user.comparePassword(req.body.currentPassword);
+  if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+  user.passwordHash = await bcrypt.hash(req.body.newPassword, 12);
+  await user.save();
+  logAudit(req, 'update', 'User', user._id, { details: 'password changed' });
+  res.json({ changed: true });
 });
 
 // Bootstrap endpoint (only works when DB has zero users) — for first setup & tests

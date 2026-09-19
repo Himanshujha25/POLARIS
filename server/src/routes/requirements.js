@@ -7,6 +7,7 @@ const Inventory = require('../models/Inventory');
 const Asset = require('../models/Asset');
 const Incident = require('../models/Incident');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { logAudit } = require('../utils/audit');
 const { assertExpeditionOpen } = require('../utils/expeditionGuard');
 
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/requirements
-router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
+router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager'), validate(schemas.requirementCreate), async (req, res) => {
   try {
     await assertExpeditionOpen(req.body.expeditionId);
     const r = await Requirement.create(req.body);
@@ -31,7 +32,7 @@ router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, re
 });
 
 // PATCH /api/v1/requirements/:id (allocated/received updates)
-router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'), async (req, res) => {
+router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'), validate(schemas.requirementUpdate), async (req, res) => {
   try {
     const r = await Requirement.findById(req.params.id);
     if (!r) return res.status(404).json({ error: 'Not found' });

@@ -5,6 +5,7 @@ const Cargo = require('../models/Cargo');
 const Asset = require('../models/Asset');
 const Requirement = require('../models/Requirement');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
@@ -19,7 +20,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/expeditions
-router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
+router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager'), validate(schemas.expeditionCreate), async (req, res) => {
   try {
     const exp = await Expedition.create(req.body);
     logAudit(req, 'create', 'Expedition', exp._id, { to: exp.expeditionCode });
@@ -41,7 +42,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH /api/v1/expeditions/:id
-router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
+router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), validate(schemas.expeditionUpdate), async (req, res) => {
   const exp = await Expedition.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
   if (!exp) return res.status(404).json({ error: 'Not found' });
   logAudit(req, 'update', 'Expedition', exp._id, { details: 'expedition updated' });

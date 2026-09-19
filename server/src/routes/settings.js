@@ -1,6 +1,7 @@
 const express = require('express');
 const Setting = require('../models/Setting');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { logAudit } = require('../utils/audit');
 
 const DEFAULTS = {
@@ -25,7 +26,7 @@ router.get('/', async (req, res) => {
 });
 
 // PATCH /api/v1/settings/:key (SuperAdmin only)
-router.patch('/:key', requireRoles('SuperAdmin'), async (req, res) => {
+router.patch('/:key', requireRoles('SuperAdmin'), validate(schemas.settingUpdate), async (req, res) => {
   const { key } = req.params;
   if (!DEFAULTS[key]) return res.status(400).json({ error: 'Unknown setting' });
   const { value } = req.body || {};

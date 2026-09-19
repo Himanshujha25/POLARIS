@@ -1,6 +1,7 @@
 const express = require('express');
 const Location = require('../models/Location');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
@@ -26,7 +27,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/locations
-router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'), async (req, res) => {
+router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'), validate(schemas.locationCreate), async (req, res) => {
   try {
     const loc = await Location.create(req.body);
     logAudit(req, 'create', 'Location', loc._id, { to: loc.name, details: loc.type });
@@ -35,11 +36,25 @@ router.post('/', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsOffic
 });
 
 // PATCH /api/v1/locations/:id (incl. nextResupplyDate)
-router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'), async (req, res) => {
+router.patch('/:id', requireRoles('SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'), validate(schemas.locationUpdate), async (req, res) => {
   const loc = await Location.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
   if (!loc) return res.status(404).json({ error: 'Not found' });
   logAudit(req, 'update', 'Location', loc._id, { details: 'location updated' });
   res.json(loc);
+});
+
+// GET /api/v1/locations/map — DB-driven map data: stations/camps with
+// coordinates + danger zones (dangerPolygon). No hardcoded geography here;
+// empty arrays mean the operator hasn't mapped anything yet.
+router.get('/map', async (req, res) => {
+  const locs = await Location.find({ isActive: { $ne: false } }).select('name type coordinates dangerPolygon region').limit(300);
+  const stations = locs
+    .filter(l => l.coordinates && l.coordinates.lat !== undefined && l.coordinates.lng !== undefined && !(l.dangerPolygon && l.dangerPolygon.length))
+    .map(l => ({ id: l._id, name: l.name, type: l.type, lat: l.coordinates.lat, lng: l.coordinates.lng }));
+  const zones = locs
+    .filter(l => Array.isArray(l.dangerPolygon) && l.dangerPolygon.length >= 3)
+    .map(l => ({ id: l._id, name: l.name, polygon: l.dangerPolygon }));
+  res.json({ stations, zones });
 });
 
 // DELETE /api/v1/locations/:id — blocked when stock or people reference it

@@ -4,6 +4,7 @@ const Inventory = require('../models/Inventory');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const Location = require('../models/Location');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { checkDepletion } = require('../services/automation');
 const { logAudit } = require('../utils/audit');
 
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/inventory
-router.post('/', requireRoles(...CAN_WRITE), async (req, res) => {
+router.post('/', requireRoles(...CAN_WRITE), validate(schemas.inventoryCreate), async (req, res) => {
   try {
     const item = new Inventory(req.body);
     item.recalc();
@@ -50,7 +51,7 @@ router.post('/', requireRoles(...CAN_WRITE), async (req, res) => {
 });
 
 // PATCH /api/v1/inventory/:id — edit thresholds, rates, bunker
-router.patch('/:id', requireRoles(...CAN_WRITE), async (req, res) => {
+router.patch('/:id', requireRoles(...CAN_WRITE), validate(schemas.inventoryUpdate), async (req, res) => {
   const item = await Inventory.findById(req.params.id);
   if (!item) return res.status(404).json({ error: 'Not found' });
   ['itemName', 'minimumSafeThreshold', 'criticalEmergencyThreshold', 'dailyConsumptionRate', 'storageBunker', 'expiryDate', 'unit', 'category'].forEach(f => {
@@ -75,7 +76,7 @@ router.delete('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (re
 });
 
 // PATCH /api/v1/inventory/:id/consume — every change creates a transaction (#13)
-router.patch('/:id/consume', requireRoles(...CAN_WRITE), async (req, res) => {
+router.patch('/:id/consume', requireRoles(...CAN_WRITE), validate(schemas.inventoryConsume), async (req, res) => {
   const item = await Inventory.findById(req.params.id);
   if (!item) return res.status(404).json({ error: 'Not found' });
   const { consume = 0, resupply = 0, dailyConsumptionRate, reason, emergencyOverride } = req.body || {};
@@ -101,7 +102,7 @@ router.patch('/:id/consume', requireRoles(...CAN_WRITE), async (req, res) => {
 });
 
 // POST /api/v1/inventory/transfer — linked TRANSFER_OUT + TRANSFER_IN (#14)
-router.post('/transfer', requireRoles(...CAN_WRITE), async (req, res) => {
+router.post('/transfer', requireRoles(...CAN_WRITE), validate(schemas.inventoryTransfer), async (req, res) => {
   const { fromInventoryId, toStation, quantity, reason } = req.body || {};
   const qty = Number(quantity);
   if (!fromInventoryId || !toStation || !(qty > 0)) {

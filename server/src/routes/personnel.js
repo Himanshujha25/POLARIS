@@ -4,7 +4,8 @@ const PersonnelMovement = require('../models/PersonnelMovement');
 const GeoTrack = require('../models/GeoTrack');
 const Alert = require('../models/Alert');
 const { authRequired } = require('../middleware/auth');
-const { checkGeofence } = require('../utils/geofence');
+const { validate, schemas } = require('../middleware/validate');
+const { checkGeofenceAsync } = require('../utils/geofence');
 const { logAudit } = require('../utils/audit');
 const { assertExpeditionOpen } = require('../utils/expeditionGuard');
 
@@ -24,7 +25,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/personnel — create roster entry (no duplicate active deployment)
-router.post('/', async (req, res) => {
+router.post('/', validate(schemas.personnelCreate), async (req, res) => {
   try {
     if (req.body.expeditionId) await assertExpeditionOpen(req.body.expeditionId);
     if (req.body.userId && req.body.expeditionId) {
@@ -46,7 +47,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/v1/personnel/checkin — resets dead-man countdown + records WHERE from + vitals
-router.post('/checkin', async (req, res) => {
+router.post('/checkin', validate(schemas.personnelCheckin), async (req, res) => {
   const { personnelId, badgeId, status, location, lat, lng, expectedReturn, bodyTempC, heartRate } = req.body || {};
   const query = personnelId ? { _id: personnelId } : badgeId ? { badgeId } : null;
   if (!query) return res.status(400).json({ error: 'personnelId or badgeId required' });
@@ -89,7 +90,7 @@ router.post('/checkin', async (req, res) => {
 });
 
 // POST /api/v1/personnel/telemetry — GPS + vitals + geofence check
-router.post('/telemetry', async (req, res) => {
+router.post('/telemetry', validate(schemas.personnelTelemetry), async (req, res) => {
   const { personnelId, badgeId, lat, lng, altitudeM, heartRate, bodyTempC, batteryLevelPercent, location } = req.body || {};
   if (lat === undefined || lng === undefined) return res.status(400).json({ error: 'lat and lng required' });
   const query = personnelId ? { _id: personnelId } : badgeId ? { badgeId } : null;
@@ -107,8 +108,8 @@ router.post('/telemetry', async (req, res) => {
   const io = getIO(req);
   if (io) io.emit('telemetry:update', { personnelId: p._id, badgeId: p.badgeId, lat, lng });
 
-  // Geofence interceptor
-  const zone = checkGeofence(lat, lng);
+  // Geofence interceptor (DB-driven zones, code constants as fallback)
+  const zone = await checkGeofenceAsync(lat, lng);
   let alert = null;
   if (zone) {
     alert = await Alert.create({
@@ -127,7 +128,7 @@ router.post('/telemetry', async (req, res) => {
 });
 
 // PATCH /api/v1/personnel/:id — edit roster fields
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', validate(schemas.personnelUpdate), async (req, res) => {
   const p = await Personnel.findOne({ _id: req.params.id });
   if (!p) return res.status(404).json({ error: 'Not found' });
   ['roleTitle', 'assignedFieldZone', 'currentStatus', 'currentLocation', 'expectedReturn'].forEach(f => {

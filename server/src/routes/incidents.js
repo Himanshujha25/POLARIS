@@ -5,6 +5,7 @@ const Personnel = require('../models/Personnel');
 const Asset = require('../models/Asset');
 const Inventory = require('../models/Inventory');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
@@ -39,7 +40,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/incidents — create + auto roll-call snapshot (#34.5)
-router.post('/', requireRoles(...CAN_MANAGE), async (req, res) => {
+router.post('/', requireRoles(...CAN_MANAGE), validate(schemas.incidentCreate), async (req, res) => {
   try {
     const inc = await Incident.create({ ...req.body, reportedBy: req.user.id });
     await addAction(inc._id, 'Report', `Incident reported at ${inc.location} (${inc.severity})`, req.user.id);
@@ -85,7 +86,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH /api/v1/incidents/:id/status — workflow transitions
-router.patch('/:id/status', requireRoles(...CAN_MANAGE), async (req, res) => {
+router.patch('/:id/status', requireRoles(...CAN_MANAGE), validate(schemas.incidentStatus), async (req, res) => {
   const { status, resolutionSummary, responderIds, affectedAssetIds } = req.body || {};
   const inc = await Incident.findById(req.params.id);
   if (!inc) return res.status(404).json({ error: 'Not found' });
@@ -118,7 +119,7 @@ router.patch('/:id/status', requireRoles(...CAN_MANAGE), async (req, res) => {
 });
 
 // POST /api/v1/incidents/:id/actions — record response action
-router.post('/:id/actions', requireRoles(...CAN_MANAGE), async (req, res) => {
+router.post('/:id/actions', requireRoles(...CAN_MANAGE), validate(schemas.incidentAction), async (req, res) => {
   const { description, actionType } = req.body || {};
   if (!description) return res.status(400).json({ error: 'description required' });
   const inc = await Incident.findById(req.params.id);

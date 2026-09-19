@@ -4,8 +4,10 @@ import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV } from '../components/ui';
 
-const FALLBACK_LOCATIONS = ['NCPOR Goa', 'Mumbai Port', 'Cape Town Hub', 'Research Vessel', 'Ice Shelf', 'Bharati Station', 'Maitri Station', 'Himadri Station', 'Field Camp A', 'Field Camp B'];
 const STATUSES = ['StationHab', 'FieldResearch', 'InTransit', 'MedicalQuarantine', 'SOS_Alert', 'Returned'];
+
+// Locations are 100% API-driven (GET /api/v1/locations). No hardcoded fallback:
+// empty list means the dropdown shows an explicit empty-state, never stale names.
 
 export default function Personnel() {
   const { user } = useAuth();
@@ -13,7 +15,7 @@ export default function Personnel() {
   const [exps, setExps] = useState([]);
   const [users, setUsers] = useState([]);
   const [movements, setMovements] = useState([]);
-  const [locOptions, setLocOptions] = useState(FALLBACK_LOCATIONS);
+  const [locOptions, setLocOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkId, setCheckId] = useState(null);
   const [checkForm, setCheckForm] = useState({
@@ -26,7 +28,7 @@ export default function Personnel() {
     expectedReturn: ''
   });
   const [showDeploy, setShowDeploy] = useState(false);
-  const [depForm, setDepForm] = useState({ expeditionId: '', userId: '', badgeId: '', roleTitle: '', currentLocation: 'Maitri Station' });
+  const [depForm, setDepForm] = useState({ expeditionId: '', userId: '', badgeId: '', roleTitle: '', currentLocation: '' });
   const [error, setError] = useState('');
   const [editingRoster, setEditingRoster] = useState(null);
   const [rosterForm, setRosterForm] = useState({ roleTitle: '', assignedFieldZone: '', currentStatus: 'StationHab' });
@@ -101,7 +103,7 @@ export default function Personnel() {
         body: { ...depForm, currentStatus: 'StationHab', lastCheckIn: new Date().toISOString() }
       });
       setShowDeploy(false);
-      setDepForm({ expeditionId: exps[0]?._id || '', userId: '', badgeId: '', roleTitle: '', currentLocation: locOptions[0] || 'Maitri Station' });
+      setDepForm({ expeditionId: exps[0]?._id || '', userId: '', badgeId: '', roleTitle: '', currentLocation: locOptions[0] || '' });
       load();
     } catch (err) { setError(err.message); }
   };
@@ -245,10 +247,11 @@ export default function Personnel() {
               </select>
             </Field>
             <Field label="Current Location (live from Base Stations & Camps)">
-              <select className={inputCls} value={checkForm.location} onChange={e => setCheckForm({ ...checkForm, location: e.target.value })}>
+              <select className={inputCls} required value={checkForm.location} onChange={e => setCheckForm({ ...checkForm, location: e.target.value })}>
                 <option value="">— select —</option>
                 {locOptions.map(l => <option key={l}>{l}</option>)}
               </select>
+              {locOptions.length === 0 && <p className="mt-1 text-xs text-amber-500">No locations in database — create one in the Locations page first.</p>}
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Pulse / Heart Rate (BPM)">
@@ -307,9 +310,11 @@ export default function Personnel() {
               <Field label="Role title"><input className={inputCls} value={depForm.roleTitle} onChange={e => setDepForm({ ...depForm, roleTitle: e.target.value })} placeholder="Glaciologist" /></Field>
             </div>
             <Field label="Starting location (live from Locations)">
-              <select className={inputCls} value={depForm.currentLocation} onChange={e => setDepForm({ ...depForm, currentLocation: e.target.value })}>
+              <select className={inputCls} required value={depForm.currentLocation} onChange={e => setDepForm({ ...depForm, currentLocation: e.target.value })}>
+                <option value="">— select —</option>
                 {locOptions.map(l => <option key={l}>{l}</option>)}
               </select>
+              {locOptions.length === 0 && <p className="mt-1 text-xs text-amber-500">No locations in database — create one in the Locations page first.</p>}
             </Field>
             <ErrorNote message={error} />
             <button className={btnPrimary}>Deploy</button>

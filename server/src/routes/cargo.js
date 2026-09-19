@@ -5,6 +5,7 @@ const Inventory = require('../models/Inventory');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const Requirement = require('../models/Requirement');
 const { authRequired, requireRoles } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const { logAudit } = require('../utils/audit');
 const { assertExpeditionOpen } = require('../utils/expeditionGuard');
 
@@ -31,7 +32,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/cargo
-router.post('/', requireRoles(...CAN_WRITE), async (req, res) => {
+router.post('/', requireRoles(...CAN_WRITE), validate(schemas.cargoCreate), async (req, res) => {
   try {
     await assertExpeditionOpen(req.body.expeditionId);
     const body = { ...req.body };
@@ -44,7 +45,7 @@ router.post('/', requireRoles(...CAN_WRITE), async (req, res) => {
 });
 
 // PATCH /api/v1/cargo/:id/stage — advance waypoint + timeline event
-router.patch('/:id/stage', requireRoles(...CAN_WRITE), async (req, res) => {
+router.patch('/:id/stage', requireRoles(...CAN_WRITE), validate(schemas.cargoStage), async (req, res) => {
   try {
     const cargo = await Cargo.findById(req.params.id);
     if (!cargo) return res.status(404).json({ error: 'Not found' });
@@ -78,7 +79,7 @@ router.patch('/:id/stage', requireRoles(...CAN_WRITE), async (req, res) => {
 });
 
 // POST /api/v1/cargo/:id/receive — station receipt → inventory RECEIPT + requirement progress (Test 5)
-router.post('/:id/receive', requireRoles(...CAN_WRITE), async (req, res) => {
+router.post('/:id/receive', requireRoles(...CAN_WRITE), validate(schemas.cargoReceive), async (req, res) => {
   try {
     const cargo = await Cargo.findById(req.params.id);
     if (!cargo) return res.status(404).json({ error: 'Not found' });
@@ -149,7 +150,7 @@ router.get('/:id/timeline', async (req, res) => {
 });
 
 // PATCH /api/v1/cargo/:id — edit details (title, ETA, hazmat, items)
-router.patch('/:id', requireRoles(...CAN_WRITE), async (req, res) => {
+router.patch('/:id', requireRoles(...CAN_WRITE), validate(schemas.cargoUpdate), async (req, res) => {
   try {
     const cargo = await Cargo.findById(req.params.id);
     if (!cargo) return res.status(404).json({ error: 'Not found' });

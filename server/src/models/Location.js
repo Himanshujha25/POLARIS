@@ -10,6 +10,10 @@ const locationSchema = new mongoose.Schema({
   parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Location' },
   region: String,
   coordinates: { lat: Number, lng: Number },
+  // Optional danger polygon for map + geofence interceptor: array of [lat, lng].
+  // Locations carrying a non-empty dangerPolygon are served as map danger zones
+  // and evaluated by the geofence engine (DB wins, code constants are fallback).
+  dangerPolygon: { type: [[Number]], default: undefined },
   // Days until next resupply window — drives SAFE/RISK forecast (#15)
   nextResupplyDate: Date,
   isActive: { type: Boolean, default: true }
