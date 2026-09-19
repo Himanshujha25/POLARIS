@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Sparkles, Loader2, Copy, Check, ShieldAlert } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +18,10 @@ export default function Incidents() {
   const [loading, setLoading] = useState(true);
   const [showActive, setShowActive] = useState(true);
   const [show, setShow] = useState(false);
+  const [triageModal, setTriageModal] = useState(null);
+  const [triageLoading, setTriageLoading] = useState(false);
+  const [triageData, setTriageData] = useState(null);
+  const [copiedTriage, setCopiedTriage] = useState(false);
   const [form, setForm] = useState({
     type: 'Medical',
     severity: 'High',
@@ -65,6 +70,31 @@ export default function Incidents() {
     }));
   };
 
+  const requestAITriage = async (e, incident) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTriageModal(incident);
+    setTriageLoading(true);
+    setTriageData(null);
+    try {
+      const res = await api('/api/v1/ai/triage-incident', {
+        method: 'POST',
+        body: {
+          title: incident.type,
+          severity: incident.severity,
+          category: incident.type,
+          locationName: incident.location,
+          description: incident.description
+        }
+      });
+      setTriageData(res);
+    } catch (err) {
+      setTriageData({ sop: 'Triage generation notice: ' + err.message, provider: 'offline' });
+    } finally {
+      setTriageLoading(false);
+    }
+  };
+
   const create = async (e) => {
     e.preventDefault();
     const res = await api('/api/v1/incidents', { method: 'POST', body: form });
@@ -102,31 +132,31 @@ export default function Incidents() {
         )}
       </div>
 
-      {/* 4 Emergency KPI StatCards */}
+      {/* 4 Emergency Readiness KPI StatCards */}
       <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <StatCard
           label="Active Incidents"
           value={activeCount}
-          sub="Ongoing SAR & field responses"
-          trend={activeCount > 0 ? "Active" : "Clear"}
+          sub="Unresolved active cases"
+          trend={activeCount > 0 ? "Action" : "Clear"}
           trendType={activeCount > 0 ? "warning" : "positive"}
         />
         <StatCard
-          label="Critical / High Severity"
+          label="Critical Distress"
           value={criticalCount}
-          sub="Immediate life-safety priority"
-          trend={criticalCount > 0 ? "Priority" : "Nominal"}
-          trendType={criticalCount > 0 ? "warning" : "positive"}
+          sub="Priority P1 events"
+          trend={criticalCount > 0 ? "Urgent" : "Nominal"}
+          trendType={criticalCount > 0 ? "negative" : "positive"}
         />
         <StatCard
-          label="SAR Responders Assigned"
+          label="Station Responders"
           value={users.length}
-          sub="Medical & search team ready"
+          sub="Trained muster crew"
           trend="Ready"
           trendType="positive"
         />
         <StatCard
-          label="Rescue Vehicles Ready"
+          label="Deployable Fleet"
           value={assets.length}
           sub="PistenBully & snowmobiles"
           trend="Optimal"
@@ -161,18 +191,81 @@ export default function Incidents() {
       {list.length === 0 && <Empty text={showActive ? 'No active incidents — all clear' : 'No incidents yet'} />}
       <div className="flex flex-col gap-2">
         {list.map(i => (
-          <Link key={i._id} to={`/incidents/${i._id}`}>
-            <Card className={`p-3 hover:border-red-400 ${i.severity === 'Critical' ? 'border-red-400 dark:border-red-600' : ''}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-bold">{i.incidentCode} · {i.type} @ {i.location}</p>
-                <div className="flex gap-1"><Pill value={i.severity} /><Pill value={i.status} /></div>
-              </div>
-              <p className="text-sm text-slate-600 dark:text-slate-300">{i.description}</p>
-              <p className="mt-1 text-xs text-slate-500">By {i.reportedBy?.fullName || i.reportedBy?.username} · {new Date(i.createdAt).toLocaleString()}</p>
-            </Card>
-          </Link>
+          <div key={i._id} className="relative">
+            <Link to={`/incidents/${i._id}`} className="block">
+              <Card className={`p-3.5 hover:border-red-400 transition-all ${i.severity === 'Critical' ? 'border-red-400 dark:border-red-600' : ''}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{i.incidentCode} · {i.type} @ {i.location}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => requestAITriage(e, i)}
+                      className="flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-500/20 dark:text-rose-300 transition-all cursor-pointer shadow-xs"
+                      title="Generate instant AI Emergency SOP with asset dispatch recommendations"
+                    >
+                      <Sparkles size={12} className="text-rose-600 dark:text-rose-400" />
+                      <span>✦ AI SOP Triage</span>
+                    </button>
+                    <Pill value={i.severity} />
+                    <Pill value={i.status} />
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{i.description}</p>
+                <p className="mt-2 text-[11px] text-slate-400">By {i.reportedBy?.fullName || i.reportedBy?.username || 'Station Operator'} · {new Date(i.createdAt).toLocaleString()}</p>
+              </Card>
+            </Link>
+          </div>
         ))}
       </div>
+
+      {/* AI Emergency Triage SOP Modal */}
+      {triageModal && (
+        <Modal
+          title={`🚨 AI Emergency Triage SOP: ${triageModal.incidentCode}`}
+          onClose={() => setTriageModal(null)}
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800/60 text-xs">
+              <div>
+                <span className="font-bold text-slate-900 dark:text-white">{triageModal.type}</span> · <span className="text-slate-500">{triageModal.location}</span>
+              </div>
+              <Pill value={triageModal.severity} />
+            </div>
+
+            {triageLoading ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2 text-xs text-slate-500">
+                <Loader2 size={24} className="animate-spin text-rose-600" />
+                <p>Generating Antarctic Emergency SOP with live asset dispatch recommendations...</p>
+              </div>
+            ) : triageData ? (
+              <div className="flex flex-col gap-2">
+                <div className="max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed whitespace-pre-wrap dark:border-slate-700 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
+                  {triageData.sop}
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-[10px] text-slate-400">
+                    Model: {triageData.model || 'POLARIS Emergency Heuristics'} ({triageData.provider})
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(triageData.sop);
+                      setCopiedTriage(true);
+                      setTimeout(() => setCopiedTriage(false), 2000);
+                    }}
+                    className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                  >
+                    {copiedTriage ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    <span>{copiedTriage ? 'Copied' : 'Copy SOP'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </Modal>
+      )}
 
       {show && (
         <Modal title="Report emergency incident" onClose={() => setShow(false)}>

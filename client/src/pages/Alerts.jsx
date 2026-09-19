@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Siren, FlaskConical } from 'lucide-react';
+import { Siren, FlaskConical, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
@@ -70,13 +70,29 @@ export default function Alerts() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowSos(true)}
-          className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-xs hover:bg-rose-500 transition-all active:scale-98 cursor-pointer"
-        >
-          <Siren size={16} />
-          <span>Trigger Distress SOS</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {alerts.length > 0 && (
+            <button
+              onClick={async () => {
+                if (window.confirm('Clear and acknowledge all active alerts in the database?')) {
+                  await api('/api/v1/alerts/clear-all', { method: 'POST' });
+                  load();
+                }
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-3.5 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all cursor-pointer"
+            >
+              <Trash2 size={15} />
+              <span>Clear All Active Alerts</span>
+            </button>
+          )}
+          <button
+            onClick={() => setShowSos(true)}
+            className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-xs hover:bg-rose-500 transition-all active:scale-98 cursor-pointer"
+          >
+            <Siren size={16} />
+            <span>Trigger Distress SOS</span>
+          </button>
+        </div>
       </div>
 
       {/* 4 Alerts KPI StatCards */}

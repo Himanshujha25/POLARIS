@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Boxes, Package, ShieldCheck, Database, ArrowRightLeft } from 'lucide-react';
+import { Plus, Boxes, Package, ShieldCheck, Database, ArrowRightLeft, Sparkles, Loader2, Copy, Check, Fuel } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
@@ -46,6 +46,26 @@ export default function Inventory() {
     dailyConsumptionRate: 5,
     storageBunker: 'Bunker Alpha (Heated Bay)'
   });
+
+  // AI Winterover Forecast State
+  const [showAiDepletion, setShowAiDepletion] = useState(false);
+  const [aiDepletionLoading, setAiDepletionLoading] = useState(false);
+  const [aiDepletionData, setAiDepletionData] = useState(null);
+  const [copiedAi, setCopiedAi] = useState(false);
+
+  const runAIDepletion = async () => {
+    setShowAiDepletion(true);
+    setAiDepletionLoading(true);
+    setAiDepletionData(null);
+    try {
+      const res = await api('/api/v1/ai/predictive-depletion', { method: 'POST' });
+      setAiDepletionData(res);
+    } catch (err) {
+      setAiDepletionData({ prediction: 'AI forecast error: ' + err.message, provider: 'offline' });
+    } finally {
+      setAiDepletionLoading(false);
+    }
+  };
 
   const canEdit = ['SuperAdmin', 'ExpeditionManager', 'InventoryOfficer'].includes(user?.role);
   // Station options derived live: Locations API first, then stations actually in stock
@@ -217,6 +237,14 @@ export default function Inventory() {
               Add Stock Item
             </button>
           )}
+          <button
+            onClick={runAIDepletion}
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-xs font-bold text-cyan-700 hover:bg-cyan-500/20 dark:text-cyan-300 transition-all cursor-pointer shadow-xs"
+            title="Calculate winterover fuel & consumables runout risk with live generator load"
+          >
+            <Sparkles size={14} className="text-cyan-600 dark:text-cyan-400" />
+            <span>✦ AI Winterover Forecast</span>
+          </button>
           <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-2 text-xs font-semibold'}>
             Export Stock CSV
           </button>
@@ -522,6 +550,46 @@ export default function Inventory() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* AI Winterover Consumables Depletion Modal */}
+      {showAiDepletion && (
+        <Modal
+          title="✦ POLARIS AI Winterover Depletion Forecast"
+          onClose={() => setShowAiDepletion(false)}
+        >
+          <div className="flex flex-col gap-3">
+            {aiDepletionLoading ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2 text-xs text-slate-500">
+                <Loader2 size={24} className="animate-spin text-cyan-600" />
+                <p>Computing polar sub-zero generator load & winterover runout curves...</p>
+              </div>
+            ) : aiDepletionData ? (
+              <div className="flex flex-col gap-2">
+                <div className="max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed whitespace-pre-wrap dark:border-slate-700 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
+                  {aiDepletionData.prediction}
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-[10px] text-slate-400">
+                    Model: {aiDepletionData.model || 'Polaris Heuristic v2.4'} ({aiDepletionData.provider})
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(aiDepletionData.prediction);
+                      setCopiedAi(true);
+                      setTimeout(() => setCopiedAi(false), 2000);
+                    }}
+                    className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                  >
+                    {copiedAi ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    <span>{copiedAi ? 'Copied' : 'Copy Forecast'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </Modal>
       )}
 

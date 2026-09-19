@@ -5,7 +5,8 @@ import {
   Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog, KeyRound,
   MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon, Radio,
   Wind, Thermometer, Volume2, VolumeX, Terminal, WifiOff, RefreshCw,
-  ChevronRight, ChevronDown, MessageSquare, Search, Activity, Check
+  ChevronRight, ChevronDown, MessageSquare, Search, Activity, Check, Sparkles, MessageCircle, Bot,
+  Trash2, CheckCircle2, X, AlertTriangle, AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -16,6 +17,7 @@ import SearchBox from './SearchBox';
 import { DEFAULT_ROLES } from './QuickDemoBar';
 import CommandPalette from './CommandPalette';
 import FloatingSOS from './FloatingSOS';
+import PolarisCopilot from './PolarisCopilot';
 import { setAudioMuted, getAudioMuted, playRadioChirp } from '../lib/audio';
 
 // PRD persona scopes (Master PRD Section 5)
@@ -64,10 +66,11 @@ function navCls({ isActive }) {
 }
 
 export default function Layout({ children }) {
-  const { user, login, logout, liveAlerts } = useAuth();
+  const { user, login, logout, liveAlerts, clearLiveAlerts, dismissAlert } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const [showFeed, setShowFeed] = useState(false);
+  const feedRef = useRef(null);
   const [showPw, setShowPw] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [pwMsg, setPwMsg] = useState('');
@@ -86,8 +89,11 @@ export default function Layout({ children }) {
       if (sidebarRoleRef.current && !sidebarRoleRef.current.contains(e.target)) {
         setShowSidebarRoleMenu(false);
       }
+      if (feedRef.current && !feedRef.current.contains(e.target)) {
+        setShowFeed(false);
+      }
     }
-    if (showProfileMenu || showSidebarRoleMenu) {
+    if (showProfileMenu || showSidebarRoleMenu || showFeed) {
       document.addEventListener('mousedown', handleClickOutside);
       api('/api/v1/auth/users')
         .then(data => {
@@ -100,8 +106,35 @@ export default function Layout({ children }) {
 
   // Tactical HUD additions
   const [showCmdPalette, setShowCmdPalette] = useState(false);
+  const [showCopilot, setShowCopilot] = useState(false);
+  const [showSosModal, setShowSosModal] = useState(false);
+  const [liveWeather, setLiveWeather] = useState(null);
   const [isBlizzard, setIsBlizzard] = useState(false);
   const [muted, setMuted] = useState(getAudioMuted());
+
+  // Real-time Antarctic Satellite Weather Poll
+  useEffect(() => {
+    const fetchWeather = () => {
+      api('/api/v1/weather/live')
+        .then(data => setLiveWeather(data))
+        .catch(err => console.warn('[weather/live fetch notice]', err.message));
+    };
+    fetchWeather();
+    const interval = setInterval(fetchWeather, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Keyboard shortcut Ctrl+J / Cmd+J for AI Copilot
+  useEffect(() => {
+    const handleKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        setShowCopilot(v => !v);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
 
   // Offline Outbox Sync Engine
   const [offlineQueueItems, setOfflineQueueItems] = useState([]);
@@ -165,7 +198,7 @@ export default function Layout({ children }) {
         onToggleBlizzard={() => setIsBlizzard(v => !v)}
         isBlizzard={isBlizzard}
       />
-      <FloatingSOS />
+      <FloatingSOS isOpen={showSosModal} onClose={() => setShowSosModal(false)} />
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200/80 bg-white p-3.5 dark:border-slate-800 dark:bg-[#0d1424] md:flex">
         {/* Sidebar Header with 4-Point Star Logo and Collapse Chevron */}
@@ -350,25 +383,171 @@ export default function Layout({ children }) {
           </div>
 
           {/* Master Top Right Controls */}
-          <div className="flex items-center gap-3 ml-4">
-            {/* Alert Bell with Live Counter Dot */}
+          <div className="flex items-center gap-2.5 ml-4">
+            {/* AI Copilot Trigger */}
             <button
-              onClick={() => setShowFeed(v => !v)}
-              className="relative p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Live alert notifications"
+              onClick={() => setShowCopilot(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 font-semibold text-xs shadow-xs hover:shadow-cyan-500/10 transition-all cursor-pointer group"
+              title="POLARIS AI Polar Intelligence Copilot (Ctrl+J)"
             >
-              <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
+              <Sparkles size={14} className="text-cyan-600 dark:text-cyan-400 group-hover:rotate-12 transition-transform" />
+              <span>AI Copilot</span>
+              <span className="hidden md:inline-block text-[10px] font-mono px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-800 dark:text-cyan-200">⌘J</span>
             </button>
 
-            {/* Messages / Dispatch Icon */}
+            {/* Alert Bell with Live Counter Badge & Dropdown */}
+            <div className="relative" ref={feedRef}>
+              <button
+                onClick={() => setShowFeed(v => !v)}
+                className={`relative p-2 rounded-lg transition-colors cursor-pointer ${
+                  showFeed
+                    ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title="Live alert notifications"
+                aria-label="Live alert notifications"
+              >
+                <Bell size={18} />
+                {liveAlerts && liveAlerts.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-bold text-white shadow-xs animate-in zoom-in">
+                    {liveAlerts.length > 9 ? '9+' : liveAlerts.length}
+                  </span>
+                )}
+              </button>
+
+              {/* High-End Floating Notification Panel */}
+              {showFeed && (
+                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200/90 bg-white/95 dark:border-slate-800 dark:bg-[#0f172a]/95 shadow-2xl backdrop-blur-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Bell size={15} className="text-blue-600 dark:text-cyan-400" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                        Notifications
+                      </h3>
+                      {liveAlerts.length > 0 && (
+                        <span className="rounded-full bg-rose-100 px-1.5 py-0.2 text-[10px] font-bold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                          {liveAlerts.length}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {liveAlerts.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => clearLiveAlerts()}
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
+                          title="Clear all alerts from database"
+                        >
+                          <Trash2 size={12} />
+                          <span>Clear All</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowFeed(false)}
+                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Body List */}
+                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {liveAlerts.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center p-6 text-center">
+                        <CheckCircle2 size={32} className="text-emerald-500 mb-2 stroke-[1.5]" />
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          All Clear · No Active Alerts
+                        </p>
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                          Base perimeter, assets and telemetry are nominal.
+                        </p>
+                      </div>
+                    ) : (
+                      liveAlerts.map((a, i) => {
+                        const isDisaster = a.severity === 'DISASTER';
+                        const isCritical = a.severity === 'CRITICAL';
+                        return (
+                          <div
+                            key={a._id || a.id || i}
+                            className="group flex items-start justify-between gap-2.5 p-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors text-left"
+                          >
+                            <div
+                              onClick={() => { setShowFeed(false); navigate('/alerts'); }}
+                              className="flex-1 cursor-pointer min-w-0"
+                            >
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span
+                                  className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase tracking-wider ${
+                                    isDisaster
+                                      ? 'bg-rose-500/15 text-rose-600 border border-rose-500/30'
+                                      : isCritical
+                                      ? 'bg-red-500/15 text-red-600 border border-red-500/30'
+                                      : 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
+                                  }`}
+                                >
+                                  {a.severity || 'ALERT'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                  {a.type}
+                                </span>
+                              </div>
+                              <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug">
+                                {a.title}
+                              </p>
+                              {a.message && a.message !== a.title && (
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                                  {a.message}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                dismissAlert(a._id || a.id);
+                              }}
+                              className="shrink-0 p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Clear / Dismiss this notification from database"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <button
+                    type="button"
+                    onClick={() => { setShowFeed(false); navigate('/alerts'); }}
+                    className="w-full py-2 px-3 text-center text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-cyan-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors border-t border-slate-100 dark:border-slate-800 flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span>Alerts & SOS Center</span>
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Emergency SOS Distress Beacon (Header - Synced with Bell style) */}
             <button
-              onClick={() => navigate('/alerts')}
-              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors hidden sm:block"
-              title="Expedition communications"
+              onClick={() => {
+                playRadioChirp();
+                setShowSosModal(true);
+              }}
+              className="relative p-2 text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Emergency SOS Distress Beacon"
+              aria-label="Emergency SOS Beacon"
             >
-              <MessageSquare size={18} />
+              <Siren size={18} />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
             </button>
+
+
 
             {/* Dark / Light Theme Toggle */}
             <button
@@ -486,17 +665,28 @@ export default function Layout({ children }) {
 
           {/* Tactical Weather & Telemetry Pills matching SAT-LINK style */}
           <div className="hidden xl:flex items-center gap-2">
-            {/* Temperature Pill */}
-            <div className="flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+            {/* Real Satellite Temperature Pill */}
+            <div
+              className="flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300"
+              title={`Station: ${liveWeather?.primaryStation || 'Bharati Station'} | Real Satellite ECMWF data | Barometer: ${liveWeather?.current?.pressureHpa || 973.4} hPa`}
+            >
               <Thermometer size={12} className="text-sky-600 dark:text-sky-400" />
-              <span>-34°C</span>
-              <span className="text-sky-600/70 dark:text-sky-400/70 font-normal text-[10px]">(Chill -48°C)</span>
+              <span>{liveWeather?.current?.temperature !== undefined ? `${liveWeather.current.temperature}°C` : '-19.1°C'}</span>
+              <span className="text-sky-600/70 dark:text-sky-400/70 font-normal text-[10px]">
+                (Chill {liveWeather?.current?.apparentTemperature !== undefined ? `${liveWeather.current.apparentTemperature}°C` : '-24.9°C'})
+              </span>
             </div>
 
-            {/* Wind Pill */}
-            <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+            {/* Real Wind & Gale Pill */}
+            <div
+              className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300"
+              title={`Wind: ${liveWeather?.current?.windKmh || 12.6} km/h | Status: ${liveWeather?.current?.stormStatus || 'Nominal Calm'}`}
+            >
               <Wind size={12} className="text-amber-600 dark:text-amber-400" />
-              <span>42kt CAT-2 Gale</span>
+              <span>
+                {liveWeather?.current?.windKnots !== undefined ? `${liveWeather.current.windKnots}kt` : '7kt'}{' '}
+                {liveWeather?.current?.stormStatus ? liveWeather.current.stormStatus.split(' ')[0] : 'Nominal'}
+              </span>
             </div>
 
             {/* Latency Pill */}
@@ -548,20 +738,24 @@ export default function Layout({ children }) {
           <SearchBox />
         </div>
 
-        {/* Live alert dropdown */}
-        {showFeed && (
-          <div className="sticky top-[104px] z-30 mx-4 mt-2 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-[#111a2e]">
-            {liveAlerts.length === 0 && <p className="p-2 text-sm text-slate-500">No live alerts yet.</p>}
-            {liveAlerts.map((a, i) => (
-              <div key={a._id || i} className="border-b border-slate-100 p-2 text-sm last:border-0 dark:border-slate-800">
-                <p className="font-semibold">{a.title}</p>
-                <p className="text-xs text-slate-500">{a.type} · {a.severity}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
         <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-24 md:p-6 md:pb-8">{children}</main>
+
+        {/* Minimal Premium Floating AI Copilot Trigger (Synced with Sidebar Theme Palette) */}
+        <button
+          onClick={() => setShowCopilot(v => !v)}
+          className="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-white hover:bg-blue-50/80 text-blue-600 dark:bg-[#0d1424] dark:hover:bg-[#131d33] dark:text-cyan-400 shadow-lg hover:shadow-xl border border-slate-200/90 dark:border-slate-800 hover:border-blue-400/60 dark:hover:border-cyan-500/50 transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 group"
+          title="POLARIS AI Copilot (Ctrl+J)"
+          aria-label="Open POLARIS AI Copilot"
+        >
+          <Bot size={22} className="text-blue-600 dark:text-cyan-400 group-hover:scale-110 transition-transform duration-200" />
+        </button>
+
+        {/* Polaris AI Copilot Modal/Drawer */}
+        <PolarisCopilot
+          isOpen={showCopilot}
+          onClose={() => setShowCopilot(false)}
+          liveWeather={liveWeather}
+        />
 
         {/* Mobile bottom nav */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 flex gap-1 overflow-x-auto border-t border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-[#0d1424] md:hidden">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { FileText, Fuel, ShieldCheck, Printer } from 'lucide-react';
+import { FileText, Fuel, ShieldCheck, Printer, Sparkles, Loader2, Copy, Check } from 'lucide-react';
 import { api } from '../lib/api';
-import { Card, StatCard, Pill, Spinner, Empty, Field, inputCls, btnGhost, btnPrimary, CustomSelect } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Field, inputCls, btnGhost, btnPrimary, CustomSelect, Modal } from '../components/ui';
 import { exportCargoCustomsManifest, exportLifeSupportFuelAudit } from '../lib/reportGenerator';
 
 export default function Reports() {
@@ -9,6 +9,24 @@ export default function Reports() {
   const [expId, setExpId] = useState('');
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showSitrepModal, setShowSitrepModal] = useState(false);
+  const [sitrepLoading, setSitrepLoading] = useState(false);
+  const [sitrepData, setSitrepData] = useState(null);
+  const [copiedSitrep, setCopiedSitrep] = useState(false);
+
+  const generateAISitrep = async () => {
+    setShowSitrepModal(true);
+    setSitrepLoading(true);
+    setSitrepData(null);
+    try {
+      const res = await api('/api/v1/ai/sitrep-summary', { method: 'POST' });
+      setSitrepData(res);
+    } catch (err) {
+      setSitrepData({ sitrep: 'SITREP generation notice: ' + err.message, provider: 'offline' });
+    } finally {
+      setSitrepLoading(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -99,7 +117,15 @@ export default function Reports() {
           </div>
 
           {/* Government Compliance Export Actions */}
-          <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#111a2e]">
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#111a2e]">
+            <button
+              onClick={generateAISitrep}
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 transition-all hover:opacity-90 cursor-pointer"
+              title="Generate official 24-hour NCPOR & Ministry SITREP from live station data"
+            >
+              <Sparkles size={15} className="text-cyan-200 animate-pulse" />
+              <span>✦ Generate 24h AI SITREP Briefing</span>
+            </button>
             <button
               onClick={() => exportCargoCustomsManifest(report.cargo, report.expedition)}
               className="flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-bold text-blue-700 transition-all hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30 cursor-pointer"
@@ -158,6 +184,46 @@ export default function Reports() {
               <p key={t._id} className="py-0.5 text-sm">{new Date(t.createdAt).toLocaleString()} · {t.type} · {t.itemName} ({t.station}): {t.openingStock} → {t.closingStock}</p>
             ))}
           </Card>
+
+          {/* AI 24h SITREP Modal */}
+          {showSitrepModal && (
+            <Modal
+              title="✦ 24-Hour NCPOR Executive SITREP (AI Generated)"
+              onClose={() => setShowSitrepModal(false)}
+            >
+              <div className="flex flex-col gap-3">
+                {sitrepLoading ? (
+                  <div className="flex flex-col items-center justify-center py-8 gap-2 text-xs text-slate-500">
+                    <Loader2 size={24} className="animate-spin text-cyan-600" />
+                    <p>Compiling live station weather, inventory & incident metrics for NCPOR / MoES briefing...</p>
+                  </div>
+                ) : sitrepData ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed whitespace-pre-wrap dark:border-slate-700 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
+                      {sitrepData.sitrep}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-[10px] text-slate-400">
+                        Model: {sitrepData.model || 'Polaris SITREP Engine'} ({sitrepData.provider})
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(sitrepData.sitrep);
+                          setCopiedSitrep(true);
+                          setTimeout(() => setCopiedSitrep(false), 2000);
+                        }}
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                      >
+                        {copiedSitrep ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                        <span>{copiedSitrep ? 'Copied' : 'Copy SITREP'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </Modal>
+          )}
         </>
       )}
     </div>

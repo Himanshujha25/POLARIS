@@ -224,6 +224,22 @@ function check(name, cond, extra = '') {
   check('rbac/register-blocked-for-nonadmin', r.status === 403, `status=${r.status}`);
   token = old;
 
+  // 15. weather & AI suite
+  r = await req('GET', '/api/v1/weather/live', null, false);
+  check('weather/live', r.status === 200 && r.data?.primaryStation && r.data?.current?.temperature !== undefined, `temp=${r.data?.current?.temperature}`);
+
+  r = await req('GET', '/api/v1/ai/status', null, false);
+  check('ai/status', r.status === 200 && r.data?.fallbackChain?.length > 0, `provider=${r.data?.primaryProvider}`);
+
+  r = await req('POST', '/api/v1/ai/chat', { message: 'Polaris operational readiness?' });
+  check('ai/chat', r.status === 200 && r.data?.text?.length > 10, `provider=${r.data?.provider}`);
+
+  r = await req('POST', '/api/v1/ai/predictive-depletion', {});
+  check('ai/predictive-depletion', r.status === 200 && r.data?.prediction, `model=${r.data?.model}`);
+
+  r = await req('POST', '/api/v1/ai/sitrep-summary', {});
+  check('ai/sitrep-summary', r.status === 200 && r.data?.sitrep, `model=${r.data?.model}`);
+
   const failed = results.filter(x => !x.pass);
   console.log(`\n==== ${results.length - failed.length}/${results.length} passed ====`);
   process.exit(failed.length ? 1 : 0);
