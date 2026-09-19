@@ -41,12 +41,12 @@ export default function SearchBox() {
 
   return (
     <div className="relative">
-      <form onSubmit={search} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700">
-        <Search size={16} className="shrink-0 text-slate-400" />
+      <form onSubmit={search} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 transition-colors focus-within:border-cyan-500 focus-within:bg-white dark:border-slate-700 dark:bg-slate-800/40 dark:focus-within:border-cyan-400 dark:focus-within:bg-[#0B111E]">
+        <Search size={15} className="shrink-0 text-slate-400 dark:text-slate-500" />
         <input
           value={q} onChange={e => setQ(e.target.value)}
           placeholder="Search…"
-          className="w-24 bg-transparent text-sm outline-none placeholder:text-slate-400 sm:w-44 lg:w-56"
+          className="w-24 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500 sm:w-44 lg:w-56"
         />
       </form>
       {open && results && (

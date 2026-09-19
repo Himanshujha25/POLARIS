@@ -12,6 +12,12 @@ const cargoSchema = new mongoose.Schema({
   weightKg: Number,
   volumeM3: Number,
   isHazmat: { type: Boolean, default: false },
+  hazmatClass: { type: String, default: null },
+  containerNumber: { type: String, index: true, default: null },
+  sealNumber: { type: String, index: true, default: null },
+  tareWeightKg: { type: Number, default: 0 },
+  maxGrossWeightKg: { type: Number, default: 0 },
+  customsDeclarationNumber: { type: String, default: null },
   currentLocation: { type: String, default: 'NCPOR Goa' },
   currentNode: {
     type: String,
@@ -32,5 +38,19 @@ const cargoSchema = new mongoose.Schema({
   qrPayload: String,
   items: [{ name: String, quantity: Number, unit: String, serialNumber: String }]
 }, { timestamps: true });
+
+cargoSchema.pre('save', function (next) {
+  if (!this.qrPayload) {
+    this.qrPayload = JSON.stringify({
+      trackingNumber: this.trackingNumber,
+      containerNumber: this.containerNumber || 'UNCONTAINERIZED',
+      sealNumber: this.sealNumber || 'N/A',
+      category: this.category,
+      isHazmat: !!this.isHazmat,
+      currentNode: this.currentNode
+    });
+  }
+  next();
+});
 
 module.exports = mongoose.model('Cargo', cargoSchema);

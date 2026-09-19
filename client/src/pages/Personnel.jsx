@@ -33,7 +33,31 @@ export default function Personnel() {
   const [editingRoster, setEditingRoster] = useState(null);
   const [rosterForm, setRosterForm] = useState({ roleTitle: '', assignedFieldZone: '', currentStatus: 'StationHab' });
   const [deletingRoster, setDeletingRoster] = useState(null);
+  const [gpxPersonnel, setGpxPersonnel] = useState(null);
+  const [gpxResult, setGpxResult] = useState(null);
+  const [gpxUploading, setGpxUploading] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const handleGpxUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !gpxPersonnel) return;
+    setGpxUploading(true);
+    setGpxResult(null);
+    setError('');
+    try {
+      const text = await file.text();
+      const res = await api(`/api/v1/personnel/${gpxPersonnel._id}/upload-gpx`, {
+        method: 'POST',
+        body: { gpxData: text }
+      });
+      setGpxResult(res);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGpxUploading(false);
+    }
+  };
 
   const canDeploy = ['SuperAdmin', 'ExpeditionManager', 'PersonnelOfficer'].includes(user?.role);
 
@@ -173,56 +197,68 @@ export default function Personnel() {
       </div>
       {list.length === 0 && <Empty text="No personnel deployed yet — use Deploy member" />}
 
-      {/* Movement history timeline */}
-      <Card className="p-4">
-        <h2 className="mb-2 font-bold">Movement history ({movements.length})</h2>
-        {movements.length === 0 ? <p className="text-sm text-slate-500">No movements recorded yet</p> : (
-          <div className="flex max-h-64 flex-col gap-2 overflow-y-auto border-l-2 border-cyan-500/40 pl-3">
-            {movements.slice(0, 30).map(m => (
-              <div key={m._id} className="text-sm">
-                <p><b>{m.personnelId?.badgeId}</b>: {m.fromLocation || '—'} → <b>{m.toLocation}</b></p>
-                <p className="text-xs text-slate-500">{new Date(m.createdAt).toLocaleString()}</p>
-              </div>
-            ))}
+      {/* Active Personnel Roster Table */}
+      <Card className="p-0 overflow-hidden shadow-sm">
+        <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+          <div>
+            <h2 className="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span>👥 Active Personnel Roster</span>
+              <span className="text-xs font-normal text-slate-500">({list.length} members deployed)</span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Live biometric vitals, GPS check-in status, and satellite track uploads</p>
           </div>
-        )}
-      </Card>
-
-      {/* Roster */}
-      <Card className="p-0">
+        </div>
         <TableWrap>
-          <table className="w-full">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr>
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/60 text-xs uppercase font-semibold text-slate-600 dark:text-slate-300">
                 <Th>Badge</Th>
-                <Th>Name</Th>
+                <Th>Member / Role</Th>
                 <Th>Status</Th>
                 <Th>Vitals (Pulse/Temp)</Th>
-                <Th>Location</Th>
-                <Th>Last check-in</Th>
-                <Th>Action</Th>
+                <Th>Current Station/Field</Th>
+                <Th>Last Check-In</Th>
+                <Th className="text-right">Actions</Th>
               </tr>
             </thead>
             <tbody>
               {list.map(p => (
-                <tr key={p._id} className="border-t border-slate-100 dark:border-slate-800">
-                  <Td className="font-mono text-xs font-bold">{p.badgeId}</Td>
-                  <Td>{p.userId?.fullName || p.userId?.username}</Td>
+                <tr key={p._id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                  <Td className="font-mono text-xs font-bold text-cyan-600 dark:text-cyan-400">{p.badgeId}</Td>
+                  <Td>
+                    <div className="font-medium text-slate-900 dark:text-slate-100">{p.userId?.fullName || p.userId?.username}</div>
+                    <div className="text-xs text-slate-400">{p.userId?.role || 'Expedition Member'}</div>
+                  </Td>
                   <Td><Pill value={p.currentStatus} /></Td>
                   <Td>
                     <div className="flex flex-col text-xs leading-tight">
-                      <span className="font-semibold text-rose-500">❤️ {p.vitals?.heartRate ? `${p.vitals.heartRate} bpm` : '—'}</span>
-                      <span className={`${p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 ? 'text-amber-500 font-bold' : 'text-slate-500 dark:text-slate-400'}`}>
+                      <span className="font-semibold text-rose-500 flex items-center gap-1">
+                        ❤️ {p.vitals?.heartRate ? `${p.vitals.heartRate} bpm` : '—'}
+                      </span>
+                      <span className={`${p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 ? 'text-amber-500 font-bold' : 'text-slate-500 dark:text-slate-400'} flex items-center gap-1`}>
                         🌡️ {p.vitals?.bodyTempC ? `${p.vitals.bodyTempC}°C` : '—'}
-                        {p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 && ' ⚠️ Low'}
+                        {p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 && ' ⚠️ Hypothermia Risk'}
                       </span>
                     </div>
                   </Td>
-                  <Td>{p.currentLocation || '—'}</Td>
-                  <Td>{p.lastCheckIn ? new Date(p.lastCheckIn).toLocaleString() : '—'}</Td>
-                  <Td>
-                    <div className="flex gap-1">
-                      <button onClick={() => openCheckin(p)} className={btnGhost + ' !px-2 !py-1 text-xs'}>Check-in</button>
+                  <Td className="text-xs max-w-[200px] truncate" title={p.currentLocation || '—'}>
+                    📍 {p.currentLocation || '—'}
+                  </Td>
+                  <Td className="text-xs text-slate-500 whitespace-nowrap">
+                    {p.lastCheckIn ? new Date(p.lastCheckIn).toLocaleString() : '—'}
+                  </Td>
+                  <Td className="text-right">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <button onClick={() => openCheckin(p)} className={btnGhost + ' !px-2.5 !py-1 text-xs font-medium'}>
+                        📍 Check-in
+                      </button>
+                      <button
+                        onClick={() => { setGpxPersonnel(p); setGpxResult(null); setError(''); }}
+                        className={btnGhost + ' !px-2.5 !py-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold border border-cyan-500/30'}
+                        title="Upload Garmin / Satellite handheld GPX track"
+                      >
+                        🛰️ GPX Trek
+                      </button>
                       {canDeploy && (
                         <>
                           <button onClick={() => openRosterEdit(p)} className={btnGhost + ' !px-2 !py-1 text-xs'}>Edit</button>
@@ -233,9 +269,36 @@ export default function Personnel() {
                   </Td>
                 </tr>
               ))}
+              {list.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="py-8 text-center text-slate-500">
+                    No personnel currently deployed. Click "+ Deploy member" above.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </TableWrap>
+      </Card>
+
+      {/* Movement history timeline */}
+      <Card className="p-4">
+        <h2 className="mb-2 font-bold text-sm flex items-center justify-between">
+          <span>📜 Personnel Movement & Transit History ({movements.length})</span>
+        </h2>
+        {movements.length === 0 ? <p className="text-sm text-slate-500">No movements recorded yet</p> : (
+          <div className="flex max-h-56 flex-col gap-2 overflow-y-auto border-l-2 border-cyan-500/40 pl-3">
+            {movements.slice(0, 20).map(m => (
+              <div key={m._id} className="text-xs">
+                <p>
+                  <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400">{m.personnelId?.badgeId}</span>:{' '}
+                  <span className="text-slate-500">{m.fromLocation || '—'}</span> → <b className="text-slate-800 dark:text-slate-200">{m.toLocation}</b>
+                </p>
+                <p className="text-[11px] text-slate-400">{new Date(m.createdAt).toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       {checkId && (
@@ -346,6 +409,62 @@ export default function Personnel() {
           onCancel={() => setDeletingRoster(null)}
           onConfirm={doDeleteRoster}
         />
+      )}
+
+      {/* Garmin / Satellite GPS GPX Trek Upload Modal */}
+      {gpxPersonnel && (
+        <Modal title={`Upload Handheld GPS Trek: ${gpxPersonnel.badgeId}`} onClose={() => setGpxPersonnel(null)}>
+          <div className="flex flex-col gap-3">
+            <div className="rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-800/50">
+              <p><b>Member:</b> {gpxPersonnel.badgeId} — {gpxPersonnel.userId?.fullName || gpxPersonnel.userId?.username}</p>
+              <p><b>Current Location:</b> {gpxPersonnel.currentLocation || 'Field'}</p>
+              <p className="mt-1 text-slate-500 dark:text-slate-400">
+                Upload a standard <code>.gpx</code> trek file exported from Garmin, inReach, or Iridium Extreme handheld units.
+                The system will automatically extract coordinates, elevation, timestamps, and scan for crevasse geofence breaches.
+              </p>
+            </div>
+
+            <Field label="Select GPX Track File (.gpx)">
+              <input
+                type="file"
+                accept=".gpx,application/gpx+xml,text/xml"
+                onChange={handleGpxUpload}
+                disabled={gpxUploading}
+                className={inputCls}
+              />
+            </Field>
+
+            {gpxUploading && (
+              <div className="flex items-center gap-2 text-xs text-cyan-600">
+                <Spinner /> Processing GPX trackpoints and checking danger zones...
+              </div>
+            )}
+
+            {gpxResult && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs dark:text-emerald-300">
+                <p className="font-bold text-emerald-800 dark:text-emerald-200">✅ GPX Trek Ingestion Complete!</p>
+                <p>• {gpxResult.pointsCount} trackpoints saved to Polar GIS database.</p>
+                <p>• Latest coordinates: Lat {gpxResult.latestCoordinates?.lat}, Lng {gpxResult.latestCoordinates?.lng} (Alt: {gpxResult.latestCoordinates?.altitudeM || 0}m)</p>
+                {gpxResult.breaches?.length > 0 ? (
+                  <p className="mt-1 font-bold text-red-600 dark:text-red-400">
+                    ⚠️ ALERT: Trek traversed hazardous crevasse sectors: {gpxResult.breaches.join(', ')}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-emerald-700 dark:text-emerald-400">✓ All trek waypoints verified safe from marked crevasse fields.</p>
+                )}
+              </div>
+            )}
+
+            <ErrorNote message={error} />
+            <button
+              type="button"
+              onClick={() => setGpxPersonnel(null)}
+              className={btnPrimary + ' mt-1'}
+            >
+              Close
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

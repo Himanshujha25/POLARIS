@@ -176,6 +176,77 @@ router.post('/telemetry', validate(schemas.personnelTelemetry), async (req, res)
   res.json({ personnel: p, geofenceBreach: zone, alert });
 });
 
+// POST /api/v1/personnel/:id/upload-gpx — Ingest Garmin/Satellite GPX trek file
+router.post('/:id/upload-gpx', async (req, res) => {
+  try {
+    const p = await Personnel.findById(req.params.id);
+    if (!p) return res.status(404).json({ error: 'Personnel not found' });
+
+    const { gpxData } = req.body || {};
+    if (!gpxData) return res.status(400).json({ error: 'gpxData XML string required' });
+
+    const { parseGPX } = require('../utils/gpxParser');
+    const trackpoints = parseGPX(gpxData);
+
+    const docs = trackpoints.map(tp => ({
+      personnelId: p._id,
+      expeditionId: p.expeditionId,
+      lat: tp.lat,
+      lng: tp.lng,
+      altitudeM: tp.altitudeM,
+      recordedAt: tp.recordedAt
+    }));
+    await GeoTrack.insertMany(docs);
+
+    const latest = trackpoints[trackpoints.length - 1];
+    p.currentCoordinates = {
+      lat: latest.lat,
+      lng: latest.lng,
+      altitudeM: latest.altitudeM,
+      lastPing: latest.recordedAt
+    };
+    p.lastCheckIn = latest.recordedAt;
+    await p.save();
+
+    const breaches = [];
+    for (const tp of trackpoints) {
+      const zone = await checkGeofenceAsync(tp.lat, tp.lng);
+      if (zone && !breaches.includes(zone)) {
+        breaches.push(zone);
+      }
+    }
+
+    let alert = null;
+    const io = getIO(req);
+    if (breaches.length > 0) {
+      alert = await Alert.create({
+        expeditionId: p.expeditionId,
+        type: 'GEOFENCE_BREACH',
+        severity: 'CRITICAL',
+        title: `GPX Trek Breach: ${p.badgeId} entered ${breaches.join(', ')}`,
+        message: `${trackpoints.length} waypoints processed. Trek traversed hazardous crevasse sectors.`,
+        sourceEntity: 'Personnel',
+        sourceId: p._id,
+        coordinates: { lat: latest.lat, lng: latest.lng }
+      });
+      if (io) io.emit('alert:new', alert);
+    }
+
+    if (io) io.emit('telemetry:update', { personnelId: p._id, badgeId: p.badgeId, lat: latest.lat, lng: latest.lng });
+
+    logAudit(req, 'upload-gpx', 'Personnel', p._id, { pointsCount: trackpoints.length, breaches });
+    res.json({
+      success: true,
+      pointsCount: trackpoints.length,
+      latestCoordinates: latest,
+      breaches,
+      alert
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // PATCH /api/v1/personnel/:id — edit roster fields
 router.patch('/:id', validate(schemas.personnelUpdate), async (req, res) => {
   const p = await Personnel.findOne({ _id: req.params.id });

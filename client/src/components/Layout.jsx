@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Rocket, Package, Boxes, Users, Wrench, Map as MapIcon,
   Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog, KeyRound,
   MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon, Radio,
-  Wind, Thermometer, Volume2, VolumeX, Terminal
+  Wind, Thermometer, Volume2, VolumeX, Terminal, WifiOff, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { api } from '../lib/api';
+import { subscribeQueue, syncQueue } from '../lib/offlineQueue';
 import { Modal, Field, inputCls, btnPrimary } from './ui';
 import SearchBox from './SearchBox';
 import QuickDemoBar from './QuickDemoBar';
@@ -74,6 +75,39 @@ export default function Layout({ children }) {
   const [showCmdPalette, setShowCmdPalette] = useState(false);
   const [isBlizzard, setIsBlizzard] = useState(false);
   const [muted, setMuted] = useState(getAudioMuted());
+
+  // Offline Outbox Sync Engine
+  const [offlineQueueItems, setOfflineQueueItems] = useState([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeQueue(setOfflineQueueItems);
+    const handleOnline = () => {
+      setIsOnline(true);
+      triggerSync();
+    };
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      unsub();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const triggerSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await syncQueue(api);
+    } catch (err) {
+      console.warn('[Sync] Notice:', err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const toggleAudio = () => {
     const next = !muted;
@@ -167,7 +201,7 @@ export default function Layout({ children }) {
           </div>
 
           {/* Polar Satellite Link Indicator */}
-          <div className="hidden lg:flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+          <div className="hidden lg:flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -176,17 +210,44 @@ export default function Layout({ children }) {
             <span>SAT-LINK: IRIDIUM NEXT</span>
           </div>
 
+          {/* Offline Sync Outbox Status Indicator */}
+          {!isOnline ? (
+            <button
+              onClick={triggerSync}
+              className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+              title="Satellite link disconnected. Mutations are queued locally in IndexedDB. Click to retry sync."
+            >
+              <WifiOff size={12} />
+              <span>OFFLINE ({offlineQueueItems.length} queued)</span>
+            </button>
+          ) : offlineQueueItems.length > 0 ? (
+            <button
+              onClick={triggerSync}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-600 transition-colors hover:bg-cyan-500/20 dark:text-cyan-300"
+              title="Pending mutations queued. Click to sync with central database."
+            >
+              <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+              <span>SYNC ({offlineQueueItems.length} pending)</span>
+            </button>
+          ) : (
+            <div className="hidden 2xl:flex items-center gap-1 text-[10px] font-medium text-slate-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span>Synced</span>
+            </div>
+          )}
+
           {/* Tactical Weather & Latency HUD Bar */}
-          <div className="hidden xl:flex items-center gap-3 px-3 py-1 rounded-full border border-slate-700/60 bg-slate-800/40 text-[11px] font-mono text-slate-400">
-            <span className="flex items-center gap-1 text-cyan-400">
+          <div className="hidden xl:flex items-center gap-3 px-3 py-1 rounded-full border border-slate-200 bg-slate-100 text-[11px] font-mono text-slate-600 dark:border-slate-700/60 dark:bg-slate-800/40 dark:text-slate-400">
+            <span className="flex items-center gap-1 font-semibold text-cyan-600 dark:text-cyan-400">
               <Thermometer size={12} /> -34°C (Chill -48°C)
             </span>
-            <span>•</span>
-            <span className="flex items-center gap-1 text-amber-400">
+            <span className="text-slate-300 dark:text-slate-600">•</span>
+            <span className="flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
               <Wind size={12} /> 42kt CAT-2 Gale
             </span>
-            <span>•</span>
-            <span className="text-emerald-400">142ms Lock</span>
+            <span className="text-slate-300 dark:text-slate-600">•</span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">142ms Lock</span>
           </div>
 
           <div className="flex-1" />
@@ -194,12 +255,12 @@ export default function Layout({ children }) {
           {/* Command Palette Trigger */}
           <button
             onClick={() => setShowCmdPalette(true)}
-            className="hidden sm:flex items-center gap-2 px-2.5 py-1 text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-lg hover:border-cyan-500/60 hover:text-cyan-400 transition-all"
+            className="hidden sm:flex items-center gap-2 px-2.5 py-1 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-lg hover:border-cyan-500/60 hover:text-cyan-600 transition-all dark:text-slate-400 dark:bg-slate-800/60 dark:border-slate-700/80 dark:hover:text-cyan-400 dark:hover:border-cyan-500/60"
             title="Open Command Palette (Ctrl+K or /)"
           >
-            <Terminal size={13} className="text-cyan-500" />
+            <Terminal size={13} className="text-cyan-600 dark:text-cyan-400" />
             <span className="hidden md:inline">Command</span>
-            <kbd className="px-1.5 py-0.2 text-[10px] font-mono bg-slate-200 dark:bg-slate-700 rounded text-slate-500 dark:text-slate-400">
+            <kbd className="px-1.5 py-0.2 text-[10px] font-mono bg-slate-200/80 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-400">
               Ctrl+K
             </kbd>
           </button>
@@ -213,7 +274,7 @@ export default function Layout({ children }) {
             className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
               isBlizzard
                 ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-extrabold shadow-sm'
-                : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:text-cyan-400'
+                : 'border-slate-200 bg-slate-100/60 text-slate-600 hover:bg-slate-100 hover:text-cyan-600 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-cyan-400'
             }`}
             title="Toggle Polar Blizzard High-Contrast Mode for extreme snow visibility"
           >
@@ -224,17 +285,17 @@ export default function Layout({ children }) {
           {/* Audio Squelch / Siren Mute Toggle */}
           <button
             onClick={toggleAudio}
-            className="rounded-lg border border-slate-200 p-2 dark:border-slate-700 text-slate-400 hover:text-slate-100"
+            className="rounded-lg border border-slate-200 bg-slate-50/60 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-100"
             title={muted ? 'Unmute tactical audio & sirens' : 'Mute tactical audio & sirens'}
           >
-            {muted ? <VolumeX size={18} className="text-red-400" /> : <Volume2 size={18} className="text-cyan-400" />}
+            {muted ? <VolumeX size={18} className="text-red-500 dark:text-red-400" /> : <Volume2 size={18} className="text-cyan-600 dark:text-cyan-400" />}
           </button>
 
           <SearchBox />
           <QuickDemoBar />
           <button
             onClick={() => setShowFeed(v => !v)}
-            className="relative rounded-lg border border-slate-200 p-2 dark:border-slate-700"
+            className="relative rounded-lg border border-slate-200 bg-slate-50/60 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-100"
             title="Live alert feed"
           >
             <Bell size={18} />
@@ -244,10 +305,18 @@ export default function Layout({ children }) {
               </span>
             )}
           </button>
-          <button onClick={toggle} className="rounded-lg border border-slate-200 p-2 dark:border-slate-700" title="Toggle theme">
+          <button
+            onClick={toggle}
+            className="rounded-lg border border-slate-200 bg-slate-50/60 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-100"
+            title="Toggle theme"
+          >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button onClick={doLogout} className="rounded-lg border border-slate-200 p-2 dark:border-slate-700 md:hidden" title="Logout">
+          <button
+            onClick={doLogout}
+            className="rounded-lg border border-slate-200 bg-slate-50/60 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-100 md:hidden"
+            title="Logout"
+          >
             <LogOut size={18} />
           </button>
         </header>
