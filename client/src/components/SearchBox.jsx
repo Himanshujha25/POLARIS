@@ -23,7 +23,7 @@ const GROUP_TITLE = {
   locations: (x) => x.name
 };
 
-export default function SearchBox() {
+export default function SearchBox({ onOpenPalette }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
   const [open, setOpen] = useState(false);
@@ -41,13 +41,28 @@ export default function SearchBox() {
 
   return (
     <div className="relative">
-      <form onSubmit={search} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 dark:border-slate-700">
-        <Search size={16} className="shrink-0 text-slate-400" />
+      <form
+        onSubmit={search}
+        className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/90 px-2.5 transition-all focus-within:border-cyan-500/70 focus-within:bg-white focus-within:ring-1 focus-within:ring-cyan-500/30 dark:border-slate-800 dark:bg-slate-900/60 dark:focus-within:bg-[#0d1424]"
+      >
+        <Search size={15} className="shrink-0 text-slate-400" />
         <input
-          value={q} onChange={e => setQ(e.target.value)}
-          placeholder="Search…"
-          className="w-24 bg-transparent text-sm outline-none placeholder:text-slate-400 sm:w-44 lg:w-56"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search ops, assets, cargo…"
+          style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
+          className="w-24 border-0 border-none bg-transparent text-xs font-medium shadow-none outline-none ring-0 placeholder:text-slate-400 text-slate-800 focus:border-none focus:outline-none focus:ring-0 dark:text-slate-200 sm:w-36 md:w-44 lg:w-52"
         />
+        {onOpenPalette && (
+          <button
+            type="button"
+            onClick={onOpenPalette}
+            className="hidden sm:inline-flex items-center gap-0.5 rounded border border-slate-300/80 bg-slate-200/70 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500 transition-colors hover:border-cyan-500/50 hover:bg-cyan-500/10 hover:text-cyan-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-cyan-300"
+            title="Open Full Command Terminal (Ctrl+K or /)"
+          >
+            Ctrl+K
+          </button>
+        )}
       </form>
       {open && results && (
         <div className="absolute right-0 top-10 max-h-96 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-[#111a2e]">

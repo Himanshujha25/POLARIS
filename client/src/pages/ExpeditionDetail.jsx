@@ -4,7 +4,7 @@ import {
   Users, Package, Wrench, Activity, Heart, Thermometer, Battery,
   ShieldAlert, CheckCircle2, Clock, AlertTriangle, Plus, Trash2,
   ChevronRight, ArrowLeft, RefreshCw, Truck, Shield, FileText, Check,
-  Radio, MapPin, Satellite, Crosshair, Navigation, LocateFixed, Siren, HeartPulse
+  Radio, MapPin, Satellite, Crosshair, Navigation, LocateFixed, Siren, HeartPulse, Biohazard
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
@@ -826,8 +826,9 @@ export default function ExpeditionDetail() {
                           <span className="font-mono font-bold text-sm text-cyan-600 dark:text-cyan-400">{c.trackingNumber}</span>
                           <Pill value={c.status} />
                           {c.isHazmat && (
-                            <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400">
-                              🔥 HAZMAT
+                            <span className="inline-flex items-center gap-1 rounded border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 shadow-xs">
+                              <Biohazard size={12} className="text-amber-500 shrink-0" />
+                              <span>HAZMAT</span>
                             </span>
                           )}
                         </div>
@@ -1427,14 +1428,17 @@ export default function ExpeditionDetail() {
                 </select>
               </Field>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer mt-1">
+            <label className="flex items-center gap-2 cursor-pointer mt-1 p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
               <input
                 type="checkbox"
                 checked={cargoForm.isHazmat}
                 onChange={e => setCargoForm({ ...cargoForm, isHazmat: e.target.checked })}
-                className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
               />
-              <span className="text-xs font-semibold text-red-600">Hazardous Materials / Fuel (HAZMAT)</span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                <Biohazard size={14} className="text-amber-500 shrink-0" />
+                <span>Hazardous Materials / Fuel (HAZMAT Compliance Protocol)</span>
+              </span>
             </label>
             <ErrorNote message={error} />
             <button className={btnPrimary}>Manifest Shipment</button>

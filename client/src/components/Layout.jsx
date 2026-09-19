@@ -14,6 +14,7 @@ import SearchBox from './SearchBox';
 import QuickDemoBar from './QuickDemoBar';
 import CommandPalette from './CommandPalette';
 import FloatingSOS from './FloatingSOS';
+import PolarTelemetryCapsule from './PolarTelemetryCapsule';
 import { setAudioMuted, getAudioMuted, playRadioChirp } from '../lib/audio';
 
 // PRD persona scopes (Master PRD Section 5)
@@ -72,7 +73,6 @@ export default function Layout({ children }) {
 
   // Tactical HUD additions
   const [showCmdPalette, setShowCmdPalette] = useState(false);
-  const [isBlizzard, setIsBlizzard] = useState(false);
   const [muted, setMuted] = useState(getAudioMuted());
 
   const toggleAudio = () => {
@@ -97,12 +97,10 @@ export default function Layout({ children }) {
   const allLinks = navSections.flatMap(s => s.links).filter(l => l.roles.includes(user?.role));
 
   return (
-    <div className={`flex min-h-full bg-slate-100 text-slate-900 dark:bg-[#0B111E] dark:text-slate-100 ${isBlizzard ? 'blizzard-mode' : ''}`}>
+    <div className="flex min-h-full bg-slate-100 text-slate-900 dark:bg-[#0B111E] dark:text-slate-100">
       <CommandPalette
         isOpen={showCmdPalette}
         onClose={setShowCmdPalette}
-        onToggleBlizzard={() => setIsBlizzard(v => !v)}
-        isBlizzard={isBlizzard}
       />
       <FloatingSOS />
       {/* Desktop sidebar */}
@@ -160,96 +158,67 @@ export default function Layout({ children }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top header */}
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-slate-200 bg-white/90 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-[#0d1424]/90 sm:px-4">
-          <div className="flex items-center gap-2 md:hidden">
-            <Snowflake className="text-cyan-500" size={22} />
-            <p className="font-extrabold tracking-wide">POLARIS</p>
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-3 backdrop-blur-md dark:border-slate-800 dark:bg-[#0d1424]/95 sm:px-4">
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Mobile Brand */}
+            <div className="flex items-center gap-2 md:hidden">
+              <Snowflake className="text-cyan-500 shrink-0" size={20} />
+              <p className="font-extrabold tracking-wider text-sm">POLARIS</p>
+            </div>
+
+            {/* Dynamic Polar Telemetry Capsule (Live Stations, Weather & Sat-Link) */}
+            <PolarTelemetryCapsule userStation={user?.station} />
           </div>
 
-          {/* Polar Satellite Link Indicator */}
-          <div className="hidden lg:flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <Radio size={12} />
-            <span>SAT-LINK: IRIDIUM NEXT</span>
+          {/* Right Action Controls Bar */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Integrated SearchBox & Command Trigger */}
+            <SearchBox onOpenPalette={() => setShowCmdPalette(true)} />
+
+            {/* Tactical Audio & Siren Mute Toggle */}
+            <button
+              onClick={toggleAudio}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+              title={muted ? 'Unmute tactical audio & sirens' : 'Mute tactical audio & sirens'}
+            >
+              {muted ? <VolumeX size={16} className="text-red-500" /> : <Volume2 size={16} className="text-cyan-500" />}
+            </button>
+
+            {/* Quick Persona & Role Switcher */}
+            <QuickDemoBar />
+
+            {/* Live Alerts Notification Bell */}
+            <button
+              onClick={() => setShowFeed(v => !v)}
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+              title="Live alert feed"
+            >
+              <Bell size={16} />
+              {liveAlerts.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-xs">
+                  {liveAlerts.length}
+                </span>
+              )}
+            </button>
+
+            {/* Theme Toggle */}
+            <button
+              onClick={toggle}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+              title="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-slate-600" />}
+            </button>
+
+            {/* Mobile Logout */}
+            <button
+              onClick={doLogout}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-red-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-red-400 md:hidden transition-colors"
+              title="Logout"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
-
-          {/* Tactical Weather & Latency HUD Bar */}
-          <div className="hidden xl:flex items-center gap-3 px-3 py-1 rounded-full border border-slate-700/60 bg-slate-800/40 text-[11px] font-mono text-slate-400">
-            <span className="flex items-center gap-1 text-cyan-400">
-              <Thermometer size={12} /> -34°C (Chill -48°C)
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1 text-amber-400">
-              <Wind size={12} /> 42kt CAT-2 Gale
-            </span>
-            <span>•</span>
-            <span className="text-emerald-400">142ms Lock</span>
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Command Palette Trigger */}
-          <button
-            onClick={() => setShowCmdPalette(true)}
-            className="hidden sm:flex items-center gap-2 px-2.5 py-1 text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-lg hover:border-cyan-500/60 hover:text-cyan-400 transition-all"
-            title="Open Command Palette (Ctrl+K or /)"
-          >
-            <Terminal size={13} className="text-cyan-500" />
-            <span className="hidden md:inline">Command</span>
-            <kbd className="px-1.5 py-0.2 text-[10px] font-mono bg-slate-200 dark:bg-slate-700 rounded text-slate-500 dark:text-slate-400">
-              Ctrl+K
-            </kbd>
-          </button>
-
-          {/* Blizzard Mode Toggle */}
-          <button
-            onClick={() => {
-              playRadioChirp();
-              setIsBlizzard(v => !v);
-            }}
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
-              isBlizzard
-                ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-extrabold shadow-sm'
-                : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:text-cyan-400'
-            }`}
-            title="Toggle Polar Blizzard High-Contrast Mode for extreme snow visibility"
-          >
-            <Snowflake size={13} className={isBlizzard ? 'animate-spin' : ''} />
-            <span>Blizzard</span>
-          </button>
-
-          {/* Audio Squelch / Siren Mute Toggle */}
-          <button
-            onClick={toggleAudio}
-            className="rounded-lg border border-slate-200 p-2 dark:border-slate-700 text-slate-400 hover:text-slate-100"
-            title={muted ? 'Unmute tactical audio & sirens' : 'Mute tactical audio & sirens'}
-          >
-            {muted ? <VolumeX size={18} className="text-red-400" /> : <Volume2 size={18} className="text-cyan-400" />}
-          </button>
-
-          <SearchBox />
-          <QuickDemoBar />
-          <button
-            onClick={() => setShowFeed(v => !v)}
-            className="relative rounded-lg border border-slate-200 p-2 dark:border-slate-700"
-            title="Live alert feed"
-          >
-            <Bell size={18} />
-            {liveAlerts.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
-                {liveAlerts.length}
-              </span>
-            )}
-          </button>
-          <button onClick={toggle} className="rounded-lg border border-slate-200 p-2 dark:border-slate-700" title="Toggle theme">
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <button onClick={doLogout} className="rounded-lg border border-slate-200 p-2 dark:border-slate-700 md:hidden" title="Logout">
-            <LogOut size={18} />
-          </button>
         </header>
 
         {/* Live feed dropdown */}

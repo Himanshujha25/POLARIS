@@ -7,7 +7,7 @@ import {
 import { api } from '../lib/api';
 import { playRadioChirp, startSiren, stopSiren } from '../lib/audio';
 
-export default function CommandPalette({ isOpen, onClose, onToggleBlizzard, isBlizzard }) {
+export default function CommandPalette({ isOpen, onClose }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [personnel, setPersonnel] = useState([]);
@@ -95,21 +95,6 @@ export default function CommandPalette({ isOpen, onClose, onToggleBlizzard, isBl
           <div className="px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
             Quick Actions
           </div>
-          <button
-            onClick={() => {
-              onToggleBlizzard?.();
-              onClose(false);
-            }}
-            className="flex items-center justify-between px-3 py-2 rounded-lg text-slate-200 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all text-left"
-          >
-            <span className="flex items-center gap-2">
-              <Snowflake size={14} className="text-cyan-400" />
-              <span>Toggle Polar Blizzard Mode (Extreme High-Contrast)</span>
-            </span>
-            <span className="text-[10px] font-mono text-cyan-400 font-bold">
-              {isBlizzard ? 'ACTIVE' : 'OFF'}
-            </span>
-          </button>
           <button
             onClick={() => {
               startSiren();

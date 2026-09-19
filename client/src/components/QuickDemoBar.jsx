@@ -46,7 +46,7 @@ export default function QuickDemoBar() {
         type="button"
         onClick={() => setOpen(o => !o)}
         disabled={switching}
-        className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 text-xs font-semibold text-cyan-600 transition-colors hover:bg-cyan-500/20 dark:text-cyan-300"
+        className="flex h-9 items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 text-xs font-semibold text-cyan-600 transition-colors hover:bg-cyan-500/20 dark:text-cyan-300"
         title="Role Switcher for Official Verification & Demonstrations"
       >
         <UserCheck size={14} />

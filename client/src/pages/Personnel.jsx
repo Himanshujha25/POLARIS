@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
@@ -94,18 +95,81 @@ export default function Personnel() {
     setCheckId(null); load();
   };
 
+  const generateNextBadgeId = (expId) => {
+    const targetExp = exps.find(x => x._id === expId);
+    const prefix = targetExp?.expeditionCode ? targetExp.expeditionCode.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() : 'BHR';
+    const existingNums = list
+      .map(p => {
+        const m = p.badgeId?.match(/\d+/);
+        return m ? parseInt(m[0], 10) : 0;
+      })
+      .filter(n => !isNaN(n) && n > 0);
+    const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
+    return `${prefix}-${nextNum}`;
+  };
+
+  const openDeployModal = () => {
+    setError('');
+    // Pick the active expedition (e.g. H1-ALPHA) or first open one
+    const activeExp = exps.find(x => ['Active', 'ActiveOnStation', 'Planning', 'InTransit'].includes(x.status)) || exps[0];
+    const expId = activeExp?._id || '';
+
+    // Find deployed user IDs in this expedition
+    const deployedUserIds = new Set(
+      list
+        .filter(p => p.expeditionId === expId && p.currentStatus !== 'Returned')
+        .map(p => (typeof p.userId === 'object' ? p.userId?._id : p.userId))
+    );
+
+    // Pick first user not yet deployed
+    const availableUser = users.find(u => !deployedUserIds.has(u._id)) || users[0];
+    const initialBadge = generateNextBadgeId(expId);
+    const initialLoc = locOptions[0] || 'Bharati Station';
+
+    setDepForm({
+      expeditionId: expId,
+      userId: availableUser?._id || '',
+      badgeId: initialBadge,
+      roleTitle: availableUser?.role ? `${availableUser.role} Specialist` : 'Field Researcher',
+      currentLocation: initialLoc
+    });
+    setShowDeploy(true);
+  };
+
   const deploy = async (e) => {
     e.preventDefault();
+    if (!depForm.expeditionId) {
+      setError('Please select an active expedition');
+      return;
+    }
+    if (!depForm.userId) {
+      setError('Please select an officer or researcher to deploy');
+      return;
+    }
+    if (!depForm.badgeId?.trim()) {
+      setError('Badge ID is required');
+      return;
+    }
+    setBusy(true);
     setError('');
     try {
       await api('/api/v1/personnel', {
         method: 'POST',
-        body: { ...depForm, currentStatus: 'StationHab', lastCheckIn: new Date().toISOString() }
+        body: {
+          ...depForm,
+          badgeId: depForm.badgeId.trim().toUpperCase(),
+          currentLocation: depForm.currentLocation || locOptions[0] || 'Bharati Station',
+          currentStatus: 'StationHab',
+          lastCheckIn: new Date().toISOString()
+        }
       });
       setShowDeploy(false);
-      setDepForm({ expeditionId: exps[0]?._id || '', userId: '', badgeId: '', roleTitle: '', currentLocation: locOptions[0] || '' });
-      load();
-    } catch (err) { setError(err.message); }
+      await load();
+    } catch (err) {
+      setError(err.message || 'Failed to deploy personnel to expedition');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const openRosterEdit = (p) => {
@@ -148,8 +212,18 @@ export default function Personnel() {
           <h1 className="text-xl font-extrabold sm:text-2xl">Personnel Movement</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">{list.length} deployed · check-in from ship, station or field</p>
         </div>
-        {canDeploy && <button className={btnPrimary} onClick={() => setShowDeploy(true)}>+ Deploy member</button>}
-        <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-1 text-xs'}>Export CSV</button>
+        <div className="flex items-center gap-2">
+          {canDeploy && (
+            <button
+              className={`${btnPrimary} flex items-center gap-1.5 font-semibold shadow-xs`}
+              onClick={openDeployModal}
+            >
+              <UserPlus size={15} />
+              <span>Deploy member</span>
+            </button>
+          )}
+          <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-1 text-xs'}>Export CSV</button>
+        </div>
       </div>
 
       {/* Deployment view: kitne / kahan / kaun */}
@@ -292,32 +366,134 @@ export default function Personnel() {
       )}
 
       {showDeploy && (
-        <Modal title="Deploy member to expedition" onClose={() => setShowDeploy(false)}>
-          <form onSubmit={deploy} className="flex flex-col gap-3">
-            <Field label="Expedition">
-              <select className={inputCls} value={depForm.expeditionId} onChange={e => setDepForm({ ...depForm, expeditionId: e.target.value })}>
-                {exps.map(x => <option key={x._id} value={x._id}>{x.expeditionCode} — {x.title}</option>)}
+        <Modal title="Deploy Member to Expedition Roster" onClose={() => !busy && setShowDeploy(false)}>
+          <form onSubmit={deploy} className="flex flex-col gap-3.5 text-xs">
+            <Field label="Target Expedition">
+              <select
+                className={inputCls}
+                required
+                value={depForm.expeditionId}
+                onChange={e => {
+                  const newExpId = e.target.value;
+                  const nextBadge = generateNextBadgeId(newExpId);
+                  const deployedInNew = new Set(
+                    list
+                      .filter(p => p.expeditionId === newExpId && p.currentStatus !== 'Returned')
+                      .map(p => (typeof p.userId === 'object' ? p.userId?._id : p.userId))
+                  );
+                  const firstAvail = users.find(u => !deployedInNew.has(u._id)) || users[0];
+                  setDepForm(prev => ({
+                    ...prev,
+                    expeditionId: newExpId,
+                    badgeId: nextBadge,
+                    userId: firstAvail?._id || prev.userId,
+                    roleTitle: firstAvail?.role ? `${firstAvail.role} Specialist` : prev.roleTitle
+                  }));
+                }}
+              >
+                {exps.map(x => (
+                  <option key={x._id} value={x._id}>
+                    {x.expeditionCode} — {x.title} ({x.status})
+                  </option>
+                ))}
               </select>
             </Field>
-            <Field label="User">
-              <select className={inputCls} required value={depForm.userId} onChange={e => setDepForm({ ...depForm, userId: e.target.value })}>
+
+            <Field label="Select Officer / Researcher to Deploy">
+              <select
+                className={inputCls}
+                required
+                value={depForm.userId}
+                onChange={e => {
+                  const selUser = users.find(u => u._id === e.target.value);
+                  setDepForm(prev => ({
+                    ...prev,
+                    userId: e.target.value,
+                    roleTitle: selUser?.role ? `${selUser.role} Specialist` : prev.roleTitle
+                  }));
+                }}
+              >
                 <option value="">— select user —</option>
-                {users.map(u => <option key={u._id} value={u._id}>{u.fullName} ({u.role})</option>)}
+                {users.map(u => {
+                  const isAlreadyDeployed = list.some(
+                    p => p.expeditionId === depForm.expeditionId &&
+                         p.currentStatus !== 'Returned' &&
+                         ((p.userId?._id || p.userId) === u._id)
+                  );
+                  return (
+                    <option key={u._id} value={u._id} disabled={isAlreadyDeployed}>
+                      {u.fullName || u.username} ({u.role}) {isAlreadyDeployed ? '— [Already Deployed]' : '✓ Available'}
+                    </option>
+                  );
+                })}
               </select>
             </Field>
+
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Badge ID"><input className={inputCls} required value={depForm.badgeId} onChange={e => setDepForm({ ...depForm, badgeId: e.target.value })} placeholder="POL-007" /></Field>
-              <Field label="Role title"><input className={inputCls} value={depForm.roleTitle} onChange={e => setDepForm({ ...depForm, roleTitle: e.target.value })} placeholder="Glaciologist" /></Field>
+              <Field label="Assigned Badge ID">
+                <div className="flex gap-1.5">
+                  <input
+                    className={`${inputCls} font-mono uppercase font-bold`}
+                    required
+                    value={depForm.badgeId}
+                    onChange={e => setDepForm({ ...depForm, badgeId: e.target.value })}
+                    placeholder="BHR-5"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setDepForm(prev => ({ ...prev, badgeId: generateNextBadgeId(prev.expeditionId) }))}
+                    className="px-2 py-1 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 text-[10px] shrink-0 font-medium"
+                    title="Generate next available badge code"
+                  >
+                    Next
+                  </button>
+                </div>
+              </Field>
+
+              <Field label="Expedition Role Title">
+                <input
+                  className={inputCls}
+                  required
+                  value={depForm.roleTitle}
+                  onChange={e => setDepForm({ ...depForm, roleTitle: e.target.value })}
+                  placeholder="e.g. Field Geologist"
+                />
+              </Field>
             </div>
-            <Field label="Starting location (live from Locations)">
-              <select className={inputCls} required value={depForm.currentLocation} onChange={e => setDepForm({ ...depForm, currentLocation: e.target.value })}>
-                <option value="">— select —</option>
-                {locOptions.map(l => <option key={l}>{l}</option>)}
+
+            <Field label="Initial Deployment Station / Habitat">
+              <select
+                className={inputCls}
+                required
+                value={depForm.currentLocation}
+                onChange={e => setDepForm({ ...depForm, currentLocation: e.target.value })}
+              >
+                {(locOptions.length > 0 ? locOptions : ['Bharati Station', 'Maitri Station', 'Himadri Station', 'Cape Town Hub', 'Field Base Alpha']).map(l => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
               </select>
-              {locOptions.length === 0 && <p className="mt-1 text-xs text-amber-500">No locations in database — create one in the Locations page first.</p>}
             </Field>
+
             <ErrorNote message={error} />
-            <button className={btnPrimary}>Deploy</button>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowDeploy(false)}
+                disabled={busy}
+                className={btnGhost}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={busy}
+                className={`${btnPrimary} flex items-center gap-1.5`}
+              >
+                <UserPlus size={14} />
+                <span>{busy ? 'Deploying to Roster...' : 'Deploy Member'}</span>
+              </button>
+            </div>
           </form>
         </Modal>
       )}

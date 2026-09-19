@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Biohazard } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
@@ -182,7 +182,20 @@ export default function Cargo() {
               <p className="font-bold">{c.trackingNumber}</p>
               <Pill value={c.status} />
             </div>
-            <p className="text-sm">{c.title} · {c.weightKg}kg {c.isHazmat && '· ⚠️ HAZMAT'}</p>
+            <div className="flex flex-wrap items-center gap-2 text-sm mt-0.5">
+              <span className="font-semibold text-slate-800 dark:text-slate-200">{c.title}</span>
+              <span className="text-slate-400">•</span>
+              <span className="text-slate-500 dark:text-slate-400">{c.weightKg} kg</span>
+              {c.isHazmat && (
+                <span
+                  className="inline-flex items-center gap-1 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-400 shadow-xs"
+                  title="Hazardous Materials (HAZMAT: Class 3 Fuel, Lithium, Cryogenics)"
+                >
+                  <Biohazard size={13} className="text-amber-500 shrink-0" />
+                  <span>HAZMAT</span>
+                </span>
+              )}
+            </div>
             {c.items && c.items.length > 0 && (
               <div className="mt-1.5 rounded bg-slate-50 p-2 text-xs dark:bg-slate-800/40">
                 <p className="font-semibold text-slate-500 dark:text-slate-400">📦 Manifest / Container Items ({c.items.length}):</p>
@@ -245,14 +258,17 @@ export default function Cargo() {
                 onChange={e => setForm({ ...form, itemsText: e.target.value })}
               />
             </Field>
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
               <input
                 type="checkbox"
                 checked={form.isHazmat}
                 onChange={e => setForm({ ...form, isHazmat: e.target.checked })}
-                className="rounded border-slate-300"
+                className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
               />
-              ⚠️ Classify as Hazardous Material (Hazmat / Fuel / Cold Chain Lithium)
+              <span className="inline-flex items-center gap-1.5">
+                <Biohazard size={14} className="text-amber-500 shrink-0" />
+                <span>Classify as Hazardous Material (HAZMAT: Polar Fuel, Batteries, Cryogenics)</span>
+              </span>
             </label>
             <button className={btnPrimary}>Register Cargo Manifest</button>
           </form>
