@@ -47,3 +47,20 @@ body {
   100% { transform: scale(1.6); opacity: 0; }
 }
 .sos-ping { animation: polaris-ping 1.1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+/* Polar Blizzard Mode: Extreme High-Contrast & Polar Glove Visibility */
+.blizzard-mode {
+  filter: contrast(1.3) saturate(1.15);
+}
+.blizzard-mode button {
+  font-weight: 800 !important;
+  border-width: 2px !important;
+}
+.blizzard-mode input, .blizzard-mode select, .blizzard-mode textarea {
+  border-width: 2px !important;
+  font-weight: 700 !important;
+}
+.blizzard-mode .leaflet-container {
+  filter: contrast(1.4) brightness(0.9) !important;
+}
+

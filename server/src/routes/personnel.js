@@ -48,7 +48,7 @@ router.post('/', validate(schemas.personnelCreate), async (req, res) => {
 
 // POST /api/v1/personnel/checkin — resets dead-man countdown + records WHERE from + vitals
 router.post('/checkin', validate(schemas.personnelCheckin), async (req, res) => {
-  const { personnelId, badgeId, status, location, lat, lng, expectedReturn, bodyTempC, heartRate } = req.body || {};
+  const { personnelId, badgeId, status, location, lat, lng, altitudeM, expectedReturn, bodyTempC, heartRate, batteryLevelPercent, notes } = req.body || {};
   const query = personnelId ? { _id: personnelId } : badgeId ? { badgeId } : null;
   if (!query) return res.status(400).json({ error: 'personnelId or badgeId required' });
   const p = await Personnel.findOne(query);
@@ -58,23 +58,37 @@ router.post('/checkin', validate(schemas.personnelCheckin), async (req, res) => 
   if (status) p.currentStatus = status;
   if (location) p.currentLocation = location;
   if (expectedReturn) p.expectedReturn = new Date(expectedReturn);
-  if (lat !== undefined && lng !== undefined) {
+  if (lat !== undefined && lng !== undefined && lat !== '' && lng !== '') {
     p.currentCoordinates = {
       ...(p.currentCoordinates?.toObject?.() || {}),
-      lat: Number(lat), lng: Number(lng), lastPing: new Date()
+      lat: Number(lat), lng: Number(lng), altitudeM: altitudeM !== undefined && altitudeM !== '' ? Number(altitudeM) : p.currentCoordinates?.altitudeM, lastPing: new Date()
     };
   } else if (p.currentCoordinates) p.currentCoordinates.lastPing = new Date();
   else p.currentCoordinates = { lastPing: new Date() };
 
-  // Record vitals (pulse / body temperature)
-  if (heartRate !== undefined || bodyTempC !== undefined) {
+  // Record vitals (pulse / body temperature / battery)
+  if (heartRate !== undefined || bodyTempC !== undefined || batteryLevelPercent !== undefined) {
     p.vitals = {
       ...(p.vitals?.toObject?.() || {}),
       heartRate: heartRate !== undefined && heartRate !== '' ? Number(heartRate) : p.vitals?.heartRate,
-      bodyTempC: bodyTempC !== undefined && bodyTempC !== '' ? Number(bodyTempC) : p.vitals?.bodyTempC
+      bodyTempC: bodyTempC !== undefined && bodyTempC !== '' ? Number(bodyTempC) : p.vitals?.bodyTempC,
+      batteryLevelPercent: batteryLevelPercent !== undefined && batteryLevelPercent !== '' ? Number(batteryLevelPercent) : p.vitals?.batteryLevelPercent
     };
   }
   await p.save();
+
+  // If coordinates provided, record breadcrumb path
+  if (lat !== undefined && lng !== undefined && lat !== '' && lng !== '') {
+    await GeoTrack.create({
+      personnelId: p._id,
+      expeditionId: p.expeditionId,
+      lat: Number(lat),
+      lng: Number(lng),
+      altitudeM: altitudeM ? Number(altitudeM) : undefined,
+      batteryLevelPercent: batteryLevelPercent ? Number(batteryLevelPercent) : undefined
+    }).catch(() => {});
+  }
+
   // Movement history: record when location actually changes (#21)
   if (location && location !== fromLocation) {
     await PersonnelMovement.create({
@@ -85,8 +99,43 @@ router.post('/checkin', validate(schemas.personnelCheckin), async (req, res) => 
   }
   logAudit(req, 'assignment', 'Personnel', p._id, { to: `${p.currentStatus}@${p.currentLocation || '?'}` });
   const io = getIO(req);
-  if (io) io.emit('telemetry:update', { personnelId: p._id, badgeId: p.badgeId, status: p.currentStatus, location: p.currentLocation });
-  res.json(p);
+  if (io) io.emit('telemetry:update', { personnelId: p._id, badgeId: p.badgeId, status: p.currentStatus, location: p.currentLocation, coordinates: p.currentCoordinates });
+
+  // If status is SOS_Alert, escalate immediately to emergency alert system
+  let alert = null;
+  if (p.currentStatus === 'SOS_Alert') {
+    alert = await Alert.create({
+      expeditionId: p.expeditionId,
+      type: 'SOS_TRIGGER',
+      severity: 'CRITICAL',
+      title: `🚨 SOS DISTRESS BEACON: ${p.badgeId}`,
+      message: `Emergency SOS check-in triggered by crew member at ${p.currentLocation || 'field'}. Lat=${p.currentCoordinates?.lat ?? 'unknown'}, Lng=${p.currentCoordinates?.lng ?? 'unknown'}. Notes: ${notes || 'Immediate assistance required'}`,
+      sourceEntity: 'Personnel',
+      sourceId: p._id,
+      coordinates: p.currentCoordinates?.lat ? { lat: p.currentCoordinates.lat, lng: p.currentCoordinates.lng } : undefined
+    });
+    if (io) io.emit('alert:new', alert);
+  }
+
+  // Geofence check if coordinates provided
+  if (p.currentCoordinates?.lat && p.currentCoordinates?.lng) {
+    const zone = await checkGeofenceAsync(p.currentCoordinates.lat, p.currentCoordinates.lng);
+    if (zone) {
+      const geoAlert = await Alert.create({
+        expeditionId: p.expeditionId,
+        type: 'GEOFENCE_BREACH',
+        severity: 'CRITICAL',
+        title: `Geofence breach: ${p.badgeId} in ${zone}`,
+        message: `lat=${p.currentCoordinates.lat}, lng=${p.currentCoordinates.lng}`,
+        sourceEntity: 'Personnel',
+        sourceId: p._id,
+        coordinates: { lat: p.currentCoordinates.lat, lng: p.currentCoordinates.lng }
+      });
+      if (io) io.emit('alert:new', geoAlert);
+    }
+  }
+
+  res.json({ personnel: p, alert });
 });
 
 // POST /api/v1/personnel/telemetry — GPS + vitals + geofence check

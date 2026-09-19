@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
+import { Plus, Boxes, Package, ShieldCheck, Database, ArrowRightLeft } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV } from '../components/ui';
+
+const INV_CATEGORIES = [
+  'Provisions',
+  'HazardousFuel',
+  'ScientificInstruments',
+  'HeavySpares',
+  'MedicalLifeSupport'
+];
 
 export default function Inventory() {
   const { user } = useAuth();
@@ -23,6 +32,20 @@ export default function Inventory() {
   const [itemForm, setItemForm] = useState({ minimumSafeThreshold: '', criticalEmergencyThreshold: '', dailyConsumptionRate: '', storageBunker: '' });
   const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  // Add Item Modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    itemName: '',
+    station: '',
+    category: 'Provisions',
+    currentStock: 100,
+    unit: 'rations',
+    minimumSafeThreshold: 30,
+    criticalEmergencyThreshold: 10,
+    dailyConsumptionRate: 5,
+    storageBunker: 'Bunker Alpha (Heated Bay)'
+  });
 
   const canEdit = ['SuperAdmin', 'ExpeditionManager', 'InventoryOfficer'].includes(user?.role);
   // Station options derived live: Locations API first, then stations actually in stock
@@ -45,6 +68,41 @@ export default function Inventory() {
   };
   useEffect(() => { load(); }, [stationF]);
   useLiveRefresh(load);
+
+  const handleAddInventory = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api('/api/v1/inventory', {
+        method: 'POST',
+        body: {
+          ...addForm,
+          station: addForm.station || stationOptions[0] || 'Bharati',
+          currentStock: Number(addForm.currentStock),
+          minimumSafeThreshold: Number(addForm.minimumSafeThreshold),
+          criticalEmergencyThreshold: Number(addForm.criticalEmergencyThreshold),
+          dailyConsumptionRate: Number(addForm.dailyConsumptionRate)
+        }
+      });
+      setShowAddModal(false);
+      setAddForm({
+        itemName: '',
+        station: stationOptions[0] || 'Bharati',
+        category: 'Provisions',
+        currentStock: 100,
+        unit: 'rations',
+        minimumSafeThreshold: 30,
+        criticalEmergencyThreshold: 10,
+        dailyConsumptionRate: 5,
+        storageBunker: 'Bunker Alpha (Heated Bay)'
+      });
+      load();
+    } catch (err) {
+      setError(err.message || 'Failed to add inventory item');
+    }
+    setBusy(false);
+  };
 
   const applyConsume = async (e) => {
     e.preventDefault();
@@ -126,8 +184,26 @@ export default function Inventory() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold sm:text-2xl">Station Inventory & Life Support</h1>
-        <div className="flex gap-2">
+        <h1 className="text-xl font-extrabold sm:text-2xl flex items-center gap-2">
+          <Boxes className="text-cyan-500" size={24} />
+          Station Inventory & Life Support
+        </h1>
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit && (
+            <button
+              onClick={() => {
+                setError('');
+                if (!addForm.station && stationOptions.length > 0) {
+                  setAddForm(prev => ({ ...prev, station: stationOptions[0] }));
+                }
+                setShowAddModal(true);
+              }}
+              className={`${btnPrimary} !px-3 !py-1 text-xs flex items-center gap-1.5 font-semibold shadow-sm`}
+            >
+              <Plus size={14} />
+              Add Stock Item
+            </button>
+          )}
           <button onClick={() => setTab('stock')} className={`${btnGhost} !px-3 !py-1 text-xs ${tab === 'stock' ? '!border-cyan-500 !text-cyan-600' : ''}`}>Stock</button>
           <button onClick={() => setTab('txns')} className={`${btnGhost} !px-3 !py-1 text-xs ${tab === 'txns' ? '!border-cyan-500 !text-cyan-600' : ''}`}>Transactions</button>
           <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-1 text-xs'}>Export stock CSV</button>
@@ -252,6 +328,114 @@ export default function Inventory() {
             </div>
             <ErrorNote message={error} />
             <button className={btnPrimary}>Save changes</button>
+          </form>
+        </Modal>
+      )}
+
+      {/* Add Stock Item Modal */}
+      {showAddModal && (
+        <Modal title="Register Station Inventory Stock" onClose={() => setShowAddModal(false)}>
+          <form onSubmit={handleAddInventory} className="flex flex-col gap-3.5 text-xs">
+            <Field label="Item Name & Specification">
+              <input
+                required
+                className={inputCls}
+                placeholder="e.g. Jet-A1 Polar Low-Freeze Aviation Fuel"
+                value={addForm.itemName}
+                onChange={e => setAddForm({ ...addForm, itemName: e.target.value })}
+              />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Station Base">
+                <select
+                  className={inputCls}
+                  value={addForm.station}
+                  onChange={e => setAddForm({ ...addForm, station: e.target.value })}
+                >
+                  {(stationOptions.length ? stationOptions : ['Bharati', 'Maitri', 'Himadri']).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
+              <Field label="Category">
+                <select
+                  className={inputCls}
+                  value={addForm.category}
+                  onChange={e => setAddForm({ ...addForm, category: e.target.value })}
+                >
+                  {INV_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Initial Stock Quantity">
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  className={inputCls}
+                  value={addForm.currentStock}
+                  onChange={e => setAddForm({ ...addForm, currentStock: e.target.value })}
+                />
+              </Field>
+              <Field label="Measurement Unit">
+                <input
+                  required
+                  className={inputCls}
+                  placeholder="e.g. Liters, kg, ration-packs"
+                  value={addForm.unit}
+                  onChange={e => setAddForm({ ...addForm, unit: e.target.value })}
+                />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Warning Safe Level">
+                <input
+                  type="number"
+                  min="0"
+                  className={inputCls}
+                  value={addForm.minimumSafeThreshold}
+                  onChange={e => setAddForm({ ...addForm, minimumSafeThreshold: e.target.value })}
+                />
+              </Field>
+              <Field label="Critical Alert Level">
+                <input
+                  type="number"
+                  min="0"
+                  className={inputCls}
+                  value={addForm.criticalEmergencyThreshold}
+                  onChange={e => setAddForm({ ...addForm, criticalEmergencyThreshold: e.target.value })}
+                />
+              </Field>
+              <Field label="Daily Burn Rate">
+                <input
+                  type="number"
+                  min="0"
+                  className={inputCls}
+                  value={addForm.dailyConsumptionRate}
+                  onChange={e => setAddForm({ ...addForm, dailyConsumptionRate: e.target.value })}
+                />
+              </Field>
+            </div>
+
+            <Field label="Storage Bunker / Bay Location">
+              <input
+                className={inputCls}
+                placeholder="e.g. Cold Fuel Depot Bay 4, Bunker Alpha"
+                value={addForm.storageBunker}
+                onChange={e => setAddForm({ ...addForm, storageBunker: e.target.value })}
+              />
+            </Field>
+
+            <ErrorNote message={error} />
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button type="button" onClick={() => setShowAddModal(false)} className={btnGhost}>Cancel</button>
+              <button type="submit" disabled={busy} className={btnPrimary}>
+                {busy ? 'Adding...' : 'Add Stock Item'}
+              </button>
+            </div>
           </form>
         </Modal>
       )}

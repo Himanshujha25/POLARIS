@@ -3,7 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Rocket, Package, Boxes, Users, Wrench, Map as MapIcon,
   Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog, KeyRound,
-  MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon, Radio
+  MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon, Radio,
+  Wind, Thermometer, Volume2, VolumeX, Terminal
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -11,6 +12,9 @@ import { api } from '../lib/api';
 import { Modal, Field, inputCls, btnPrimary } from './ui';
 import SearchBox from './SearchBox';
 import QuickDemoBar from './QuickDemoBar';
+import CommandPalette from './CommandPalette';
+import FloatingSOS from './FloatingSOS';
+import { setAudioMuted, getAudioMuted, playRadioChirp } from '../lib/audio';
 
 // PRD persona scopes (Master PRD Section 5)
 const SA = 'SuperAdmin', EM = 'ExpeditionManager', LO = 'LogisticsOfficer',
@@ -66,6 +70,18 @@ export default function Layout({ children }) {
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [pwMsg, setPwMsg] = useState('');
 
+  // Tactical HUD additions
+  const [showCmdPalette, setShowCmdPalette] = useState(false);
+  const [isBlizzard, setIsBlizzard] = useState(false);
+  const [muted, setMuted] = useState(getAudioMuted());
+
+  const toggleAudio = () => {
+    const next = !muted;
+    setMuted(next);
+    setAudioMuted(next);
+    if (!next) playRadioChirp();
+  };
+
   const doLogout = () => { logout(); navigate('/'); };
 
   const changePassword = async (e) => {
@@ -81,7 +97,14 @@ export default function Layout({ children }) {
   const allLinks = navSections.flatMap(s => s.links).filter(l => l.roles.includes(user?.role));
 
   return (
-    <div className="flex min-h-full bg-slate-100 text-slate-900 dark:bg-[#0B111E] dark:text-slate-100">
+    <div className={`flex min-h-full bg-slate-100 text-slate-900 dark:bg-[#0B111E] dark:text-slate-100 ${isBlizzard ? 'blizzard-mode' : ''}`}>
+      <CommandPalette
+        isOpen={showCmdPalette}
+        onClose={setShowCmdPalette}
+        onToggleBlizzard={() => setIsBlizzard(v => !v)}
+        isBlizzard={isBlizzard}
+      />
+      <FloatingSOS />
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-[#0d1424] md:flex">
         <div className="mb-4 flex items-center gap-2 px-2 pt-1">
@@ -153,7 +176,60 @@ export default function Layout({ children }) {
             <span>SAT-LINK: IRIDIUM NEXT</span>
           </div>
 
+          {/* Tactical Weather & Latency HUD Bar */}
+          <div className="hidden xl:flex items-center gap-3 px-3 py-1 rounded-full border border-slate-700/60 bg-slate-800/40 text-[11px] font-mono text-slate-400">
+            <span className="flex items-center gap-1 text-cyan-400">
+              <Thermometer size={12} /> -34°C (Chill -48°C)
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1 text-amber-400">
+              <Wind size={12} /> 42kt CAT-2 Gale
+            </span>
+            <span>•</span>
+            <span className="text-emerald-400">142ms Lock</span>
+          </div>
+
           <div className="flex-1" />
+
+          {/* Command Palette Trigger */}
+          <button
+            onClick={() => setShowCmdPalette(true)}
+            className="hidden sm:flex items-center gap-2 px-2.5 py-1 text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-lg hover:border-cyan-500/60 hover:text-cyan-400 transition-all"
+            title="Open Command Palette (Ctrl+K or /)"
+          >
+            <Terminal size={13} className="text-cyan-500" />
+            <span className="hidden md:inline">Command</span>
+            <kbd className="px-1.5 py-0.2 text-[10px] font-mono bg-slate-200 dark:bg-slate-700 rounded text-slate-500 dark:text-slate-400">
+              Ctrl+K
+            </kbd>
+          </button>
+
+          {/* Blizzard Mode Toggle */}
+          <button
+            onClick={() => {
+              playRadioChirp();
+              setIsBlizzard(v => !v);
+            }}
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
+              isBlizzard
+                ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-extrabold shadow-sm'
+                : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:text-cyan-400'
+            }`}
+            title="Toggle Polar Blizzard High-Contrast Mode for extreme snow visibility"
+          >
+            <Snowflake size={13} className={isBlizzard ? 'animate-spin' : ''} />
+            <span>Blizzard</span>
+          </button>
+
+          {/* Audio Squelch / Siren Mute Toggle */}
+          <button
+            onClick={toggleAudio}
+            className="rounded-lg border border-slate-200 p-2 dark:border-slate-700 text-slate-400 hover:text-slate-100"
+            title={muted ? 'Unmute tactical audio & sirens' : 'Mute tactical audio & sirens'}
+          >
+            {muted ? <VolumeX size={18} className="text-red-400" /> : <Volume2 size={18} className="text-cyan-400" />}
+          </button>
+
           <SearchBox />
           <QuickDemoBar />
           <button

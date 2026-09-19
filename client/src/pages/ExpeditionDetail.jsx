@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import {
   Users, Package, Wrench, Activity, Heart, Thermometer, Battery,
   ShieldAlert, CheckCircle2, Clock, AlertTriangle, Plus, Trash2,
-  ChevronRight, ArrowLeft, RefreshCw, Truck, Shield, FileText, Check
+  ChevronRight, ArrowLeft, RefreshCw, Truck, Shield, FileText, Check,
+  Radio, MapPin, Satellite, Crosshair, Navigation, LocateFixed, Siren, HeartPulse
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
@@ -51,7 +52,21 @@ export default function ExpeditionDetail() {
   const [vitalsForm, setVitalsForm] = useState({ heartRate: 75, bodyTempC: 36.8, batteryLevelPercent: 95 });
 
   const [showCheckinModal, setShowCheckinModal] = useState(null);
-  const [checkinForm, setCheckinForm] = useState({ status: 'StationHab', location: '' });
+  const [checkinForm, setCheckinForm] = useState({
+    status: 'StationHab',
+    location: '',
+    lat: '',
+    lng: '',
+    altitudeM: '',
+    heartRate: '',
+    bodyTempC: '',
+    batteryLevelPercent: '',
+    expectedReturn: '',
+    notes: '',
+    triggerSOS: false
+  });
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState(null);
 
   const [showAddCargo, setShowAddCargo] = useState(false);
   const [cargoForm, setCargoForm] = useState({ trackingNumber: '', title: '', category: 'Provisions', weightKg: 250, isHazmat: false, transportMode: 'VesselCargo', currentNode: 'NCPOR_Goa' });
@@ -136,6 +151,49 @@ export default function ExpeditionDetail() {
     } catch (err) { alert(err.message); }
   };
 
+  const handleAcquireGPS = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation hardware API is not supported in this browser.');
+      return;
+    }
+    setGpsLoading(true);
+    setGpsAccuracy(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setGpsLoading(false);
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        const alt = pos.coords.altitude ? Math.round(pos.coords.altitude) : '';
+        const acc = Math.round(pos.coords.accuracy);
+        setGpsAccuracy(acc);
+
+        let place = '';
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+            headers: { 'User-Agent': 'POLARIS-Mission-Command/1.0' }
+          });
+          const data = await res.json();
+          if (data && data.display_name) {
+            place = data.display_name;
+          }
+        } catch { /* fallback */ }
+
+        setCheckinForm(prev => ({
+          ...prev,
+          lat,
+          lng,
+          location: place || prev.location || `Exact Device GPS (${lat}, ${lng})`,
+          altitudeM: alt !== '' ? String(alt) : prev.altitudeM
+        }));
+      },
+      (err) => {
+        setGpsLoading(false);
+        alert(`Failed to acquire GNSS position: ${err.message}. Please verify browser location permissions.`);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
   const handleCheckin = async (e) => {
     e.preventDefault();
     if (!showCheckinModal) return;
@@ -144,8 +202,15 @@ export default function ExpeditionDetail() {
         method: 'POST',
         body: {
           personnelId: showCheckinModal._id,
-          status: checkinForm.status,
-          location: checkinForm.location
+          status: checkinForm.triggerSOS ? 'SOS_Alert' : checkinForm.status,
+          location: checkinForm.location,
+          ...(checkinForm.lat && checkinForm.lng ? { lat: Number(checkinForm.lat), lng: Number(checkinForm.lng) } : {}),
+          ...(checkinForm.altitudeM ? { altitudeM: Number(checkinForm.altitudeM) } : {}),
+          ...(checkinForm.heartRate ? { heartRate: Number(checkinForm.heartRate) } : {}),
+          ...(checkinForm.bodyTempC ? { bodyTempC: Number(checkinForm.bodyTempC) } : {}),
+          ...(checkinForm.batteryLevelPercent ? { batteryLevelPercent: Number(checkinForm.batteryLevelPercent) } : {}),
+          ...(checkinForm.expectedReturn ? { expectedReturn: checkinForm.expectedReturn } : {}),
+          notes: checkinForm.notes
         }
       });
       setShowCheckinModal(null);
@@ -530,21 +595,70 @@ export default function ExpeditionDetail() {
                       <Td className="text-xs font-medium">{p.roleTitle || p.userId?.role || 'Mission Specialist'}</Td>
                       <Td className="text-xs">{p.currentLocation || p.assignedFieldZone || 'Station Base'}</Td>
                       <Td><Pill value={p.currentStatus} /></Td>
-                      <Td className="text-xs text-slate-500">
-                        {p.lastCheckIn ? new Date(p.lastCheckIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending'}
+                      <Td className="text-xs">
+                        {p.lastCheckIn ? (
+                          <div className="flex flex-col">
+                            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                              {new Date(p.lastCheckIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {Math.round((Date.now() - new Date(p.lastCheckIn).getTime()) / 60000) < 2
+                                ? 'Active just now'
+                                : `${Math.round((Date.now() - new Date(p.lastCheckIn).getTime()) / 60000)}m ago`}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs">Pending</span>
+                        )}
                       </Td>
                       <Td>
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => {
                               setShowCheckinModal(p);
-                              setCheckinForm({ status: p.currentStatus, location: p.currentLocation || '' });
+                              setGpsAccuracy(null);
+                              setCheckinForm({
+                                status: p.currentStatus === 'SOS_Alert' ? 'StationHab' : (p.currentStatus || 'StationHab'),
+                                location: p.currentLocation || '',
+                                lat: p.currentCoordinates?.lat !== undefined ? String(p.currentCoordinates.lat) : '',
+                                lng: p.currentCoordinates?.lng !== undefined ? String(p.currentCoordinates.lng) : '',
+                                altitudeM: p.currentCoordinates?.altitudeM !== undefined ? String(p.currentCoordinates.altitudeM) : '',
+                                heartRate: p.vitals?.heartRate !== undefined ? String(p.vitals.heartRate) : '',
+                                bodyTempC: p.vitals?.bodyTempC !== undefined ? String(p.vitals.bodyTempC) : '',
+                                batteryLevelPercent: p.vitals?.batteryLevelPercent !== undefined ? String(p.vitals.batteryLevelPercent) : '',
+                                expectedReturn: p.expectedReturn ? p.expectedReturn.slice(0, 16) : '',
+                                notes: '',
+                                triggerSOS: false
+                              });
                             }}
-                            className={`${btnGhost} !py-1 !px-2 text-xs`}
-                            title="Update check-in location / status"
+                            className={`${btnGhost} !py-1 !px-2 text-xs flex items-center gap-1 font-medium transition-all ${
+                              p.lastCheckIn && (Date.now() - new Date(p.lastCheckIn).getTime()) < 45 * 60 * 1000
+                                ? 'border-emerald-500/60 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                                : 'text-cyan-600 dark:text-cyan-400 hover:border-cyan-500'
+                            }`}
+                            title="Update check-in telemetry / status"
                           >
-                            Check-In
+                            {p.lastCheckIn && (Date.now() - new Date(p.lastCheckIn).getTime()) < 45 * 60 * 1000 ? (
+                              <>
+                                <CheckCircle2 size={12} className="text-emerald-500" />
+                                <span>Checked-In</span>
+                              </>
+                            ) : (
+                              <>
+                                <Radio size={12} />
+                                <span>Check-In</span>
+                              </>
+                            )}
                           </button>
+                          <Link
+                            to={`/map?badge=${p.badgeId}`}
+                            className={`${btnGhost} !py-1 !px-2 text-xs flex items-center gap-1 text-slate-600 dark:text-slate-300 hover:border-cyan-500`}
+                            title="Track on Polar Map"
+                          >
+                            <MapPin size={12} className="text-cyan-500" />
+                            Map
+                          </Link>
                           {canEdit && (
                             <button
                               onClick={() => setConfirmDelete({ type: 'member', id: p._id, label: p.badgeId })}
@@ -1049,29 +1163,201 @@ export default function ExpeditionDetail() {
         </Modal>
       )}
 
-      {/* Checkin Modal */}
+      {/* Field Telemetry & Checkin Console Modal */}
       {showCheckinModal && (
-        <Modal title={`Check-In Crew Member: ${showCheckinModal.badgeId}`} onClose={() => setShowCheckinModal(null)}>
-          <form onSubmit={handleCheckin} className="flex flex-col gap-3">
-            <Field label="Current Status">
-              <select
-                className={inputCls}
-                value={checkinForm.status}
-                onChange={e => setCheckinForm({ ...checkinForm, status: e.target.value })}
+        <Modal
+          title={`Field Telemetry & Check-In: ${showCheckinModal.badgeId}`}
+          onClose={() => setShowCheckinModal(null)}
+        >
+          <form onSubmit={handleCheckin} className="flex flex-col gap-4 text-xs">
+            {/* Quick SOS Distress Beacon Toggle */}
+            <div className={`p-3 rounded-lg border transition-all ${
+              checkinForm.triggerSOS
+                ? 'bg-red-500/10 border-red-500 text-red-400 animate-pulse'
+                : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+            }`}>
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <Siren className={checkinForm.triggerSOS ? 'text-red-500 animate-bounce' : 'text-slate-400'} size={18} />
+                  <div>
+                    <span className={`font-bold uppercase tracking-wider text-xs block ${checkinForm.triggerSOS ? 'text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                      Emergency SOS Distress Beacon
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {checkinForm.triggerSOS
+                        ? 'CRITICAL: Check-in will immediately sound station alarms and alert SAR team.'
+                        : 'Enable only if immediate SAR rescue assistance is required.'}
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={checkinForm.triggerSOS}
+                  onChange={e => setCheckinForm({ ...checkinForm, triggerSOS: e.target.checked })}
+                  className="h-5 w-5 accent-red-500 rounded cursor-pointer"
+                />
+              </label>
+            </div>
+
+            {/* Status & Location */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Current Status">
+                <select
+                  className={inputCls}
+                  disabled={checkinForm.triggerSOS}
+                  value={checkinForm.triggerSOS ? 'SOS_Alert' : checkinForm.status}
+                  onChange={e => setCheckinForm({ ...checkinForm, status: e.target.value })}
+                >
+                  {PERSONNEL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
+              <Field label="Current Location / Waypoint">
+                <input
+                  className={inputCls}
+                  required
+                  value={checkinForm.location}
+                  onChange={e => setCheckinForm({ ...checkinForm, location: e.target.value })}
+                  placeholder="e.g. Ridge Site Beta, Schirmacher Oasis"
+                />
+              </Field>
+            </div>
+
+            {/* GPS Telemetry Section */}
+            <div className="p-3 rounded-lg border border-cyan-500/20 bg-cyan-950/10 flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-cyan-500 font-bold uppercase tracking-wide">
+                  <Satellite size={14} />
+                  <span>High-Accuracy GNSS / Coordinates</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAcquireGPS}
+                  disabled={gpsLoading}
+                  className="px-2.5 py-1 text-xs font-semibold rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center gap-1.5 transition-all shadow-sm"
+                >
+                  <LocateFixed size={13} className={gpsLoading ? 'animate-spin' : ''} />
+                  {gpsLoading ? 'Acquiring GNSS...' : '🛰️ Acquire Device GPS'}
+                </button>
+              </div>
+
+              {gpsAccuracy !== null && (
+                <div className="text-[11px] text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 size={12} />
+                  <span>GNSS Lock Acquired: Accuracy ±{gpsAccuracy} meters (WGS84 High Precision)</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] text-textMuted uppercase font-mono block mb-1">Latitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    className={inputCls}
+                    value={checkinForm.lat}
+                    onChange={e => setCheckinForm({ ...checkinForm, lat: e.target.value })}
+                    placeholder="-69.4125"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-textMuted uppercase font-mono block mb-1">Longitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    className={inputCls}
+                    value={checkinForm.lng}
+                    onChange={e => setCheckinForm({ ...checkinForm, lng: e.target.value })}
+                    placeholder="76.1912"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-textMuted uppercase font-mono block mb-1">Altitude (m)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    className={inputCls}
+                    value={checkinForm.altitudeM}
+                    onChange={e => setCheckinForm({ ...checkinForm, altitudeM: e.target.value })}
+                    placeholder="45"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Wearable Biometrics & Battery */}
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Heart Rate (BPM)">
+                <div className="relative">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={checkinForm.heartRate}
+                    onChange={e => setCheckinForm({ ...checkinForm, heartRate: e.target.value })}
+                    placeholder="72"
+                  />
+                  <HeartPulse size={14} className="absolute right-2.5 top-2.5 text-rose-500" />
+                </div>
+              </Field>
+              <Field label="Body Temp (°C)">
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    className={inputCls}
+                    value={checkinForm.bodyTempC}
+                    onChange={e => setCheckinForm({ ...checkinForm, bodyTempC: e.target.value })}
+                    placeholder="36.6"
+                  />
+                  <Thermometer size={14} className="absolute right-2.5 top-2.5 text-amber-500" />
+                </div>
+              </Field>
+              <Field label="Radio Battery (%)">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className={inputCls}
+                    value={checkinForm.batteryLevelPercent}
+                    onChange={e => setCheckinForm({ ...checkinForm, batteryLevelPercent: e.target.value })}
+                    placeholder="85"
+                  />
+                  <Battery size={14} className="absolute right-2.5 top-2.5 text-emerald-500" />
+                </div>
+              </Field>
+            </div>
+
+            {/* Excursion Deadline & Field Remarks */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Expected Return / Excursion ETA">
+                <input
+                  type="datetime-local"
+                  className={inputCls}
+                  value={checkinForm.expectedReturn}
+                  onChange={e => setCheckinForm({ ...checkinForm, expectedReturn: e.target.value })}
+                />
+              </Field>
+              <Field label="Field Notes / Route Remarks">
+                <input
+                  className={inputCls}
+                  value={checkinForm.notes}
+                  onChange={e => setCheckinForm({ ...checkinForm, notes: e.target.value })}
+                  placeholder="Surface conditions, crevasses, visibility..."
+                />
+              </Field>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+              <div className="text-[11px] text-slate-500">
+                Resets the 45-minute Dead-Man Switch countdown upon submission.
+              </div>
+              <button
+                type="submit"
+                className={checkinForm.triggerSOS ? btnDanger + ' !px-5' : btnPrimary + ' !px-5'}
               >
-                {PERSONNEL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </Field>
-            <Field label="Current Location / Waypoint">
-              <input
-                className={inputCls}
-                required
-                value={checkinForm.location}
-                onChange={e => setCheckinForm({ ...checkinForm, location: e.target.value })}
-                placeholder="Field Camp 2 / Ice Shelf"
-              />
-            </Field>
-            <button className={btnPrimary}>Submit Check-In</button>
+                {checkinForm.triggerSOS ? '🚨 Broadcast Emergency Check-In & SOS' : 'Submit Mission Check-In'}
+              </button>
+            </div>
           </form>
         </Modal>
       )}
