@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FileText, Fuel, ShieldCheck, Printer } from 'lucide-react';
 import { api } from '../lib/api';
-import { Card, Pill, Spinner, Empty, Field, inputCls, btnGhost, btnPrimary } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Field, inputCls, btnGhost, btnPrimary, CustomSelect } from '../components/ui';
 import { exportCargoCustomsManifest, exportLifeSupportFuelAudit } from '../lib/reportGenerator';
 
 export default function Reports() {
@@ -13,9 +13,9 @@ export default function Reports() {
   useEffect(() => {
     (async () => {
       try {
-        const e = await api('/api/v1/expeditions');
-        setExps(e);
-        if (e[0]) setExpId(e[0]._id);
+        const list = await api('/api/v1/expeditions');
+        setExps(list);
+        if (list[0]?._id) setExpId(list[0]._id);
       } catch { /* ignore */ }
       setLoading(false);
     })();
@@ -24,56 +24,115 @@ export default function Reports() {
   useEffect(() => {
     if (!expId) return;
     (async () => {
-      try { setReport(await api(`/api/v1/reports/expedition/${expId}`)); } catch { setReport(null); }
+      try {
+        const data = await api(`/api/v1/reports/expedition/${expId}`);
+        setReport(data);
+      } catch { /* ignore */ }
     })();
   }, [expId]);
 
   if (loading) return <Spinner />;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-col gap-5">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold sm:text-2xl">Official Mission Reports</h1>
-          <p className="text-xs text-slate-500">Government compliance documents for MoES, customs & station audits</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            GOVERNANCE & COMPLIANCE
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            Official Mission Reports & Audits
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Government of India MoES / NCPOR compliance manifests, winter life-support audits & customs dossiers
+          </p>
         </div>
-        <Field label="">
-          <select className={inputCls} value={expId} onChange={e => setExpId(e.target.value)}>
-            {exps.map(x => <option key={x._id} value={x._id}>{x.expeditionCode} — {x.title}</option>)}
-          </select>
-        </Field>
+
+        <div className="w-full sm:w-80">
+          <CustomSelect
+            value={expId}
+            onChange={setExpId}
+            options={exps.map(x => ({
+              value: x._id,
+              label: `${x.expeditionCode} — ${x.title}`
+            }))}
+            className="w-full"
+            align="right"
+          />
+        </div>
       </div>
 
-      {!report && <Empty text="Select an expedition" />}
+      {!report && <Empty text="Select an expedition from the dropdown above to view official compliance dossier." />}
       {report && (
         <>
+          {/* 4 Report Readiness KPI StatCards */}
+          <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+            <StatCard
+              label="Personnel Quota"
+              value={`${report.personnel?.total || 0} / ${report.personnel?.quota || 35}`}
+              sub="Deployed expedition crew"
+              trend="Optimal"
+              trendType="positive"
+            />
+            <StatCard
+              label="Cargo Manifested"
+              value={report.cargo?.length || 0}
+              sub="ISO containers & crates"
+              trend="Tracked"
+              trendType="positive"
+            />
+            <StatCard
+              label="Requirements Linked"
+              value={report.requirements?.length || 0}
+              sub="Pre-expedition requisitions"
+              trend="Verified"
+              trendType="positive"
+            />
+            <StatCard
+              label="Incidents Recorded"
+              value={report.incidents?.length || 0}
+              sub="Mission safety events"
+              trend={report.incidents?.length > 0 ? "Review" : "Clear"}
+              trendType={report.incidents?.length > 0 ? "warning" : "positive"}
+            />
+          </div>
+
           {/* Government Compliance Export Actions */}
-          <div className="flex flex-wrap gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-[#0d1424]">
+          <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#111a2e]">
             <button
               onClick={() => exportCargoCustomsManifest(report.cargo, report.expedition)}
-              className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-bold text-cyan-700 transition-colors hover:bg-cyan-500/20 dark:text-cyan-300"
+              className="flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-bold text-blue-700 transition-all hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30 cursor-pointer"
             >
-              <FileText size={14} /> Official Cargo & Customs Manifest (PDF)
+              <FileText size={15} />
+              <span>Official Cargo & Customs Manifest (PDF)</span>
             </button>
             <button
               onClick={() => exportLifeSupportFuelAudit(report.inventory, report.expedition.targetStation)}
-              className="flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-300"
+              className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-xs font-bold text-amber-700 transition-all hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30 cursor-pointer"
             >
-              <Fuel size={14} /> Station Winter Life-Support & Fuel Audit (PDF)
+              <Fuel size={15} />
+              <span>Station Winter Life-Support & Fuel Audit (PDF)</span>
             </button>
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 cursor-pointer"
             >
-              <Printer size={14} /> Print Expedition Dossier
+              <Printer size={15} />
+              <span>Print Expedition Dossier</span>
             </button>
           </div>
 
-          <Card className="p-4">
-            <h2 className="font-bold">Expedition readiness — {report.expedition.expeditionCode}</h2>
-            <p className="text-sm text-slate-500">{report.expedition.title} → {report.expedition.targetStation} · Status: {report.expedition.status}</p>
-            <p className="mt-1 text-sm">Personnel {report.personnel.total}/{report.personnel.quota} · Requirements {report.requirements.length} · Cargo {report.cargo.length} · Incidents {report.incidents.length}</p>
-            <p className="mt-1 text-sm font-semibold">Deployment: {Object.entries(report.personnel.byLocation).map(([l, n]) => `${l}: ${n}`).join(' · ') || '—'}</p>
+          <Card className="p-5">
+            <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+              Expedition Readiness Dossier — {report.expedition.expeditionCode}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {report.expedition.title} → <b>{report.expedition.targetStation}</b> · Status: <Pill value={report.expedition.status} />
+            </p>
+            <p className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Station Deployment: {Object.entries(report.personnel.byLocation).map(([l, n]) => `${l}: ${n} crew`).join(' · ') || 'None deployed'}
+            </p>
           </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">

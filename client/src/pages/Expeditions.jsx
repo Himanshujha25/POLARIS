@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
 
 export default function Expeditions() {
   const { user } = useAuth();
@@ -74,37 +74,107 @@ export default function Expeditions() {
 
   if (loading) return <Spinner />;
 
+  const activeCount = list.filter(e => !['Completed', 'Cancelled', 'Decommissioned'].includes(e.status)).length;
+  const plannedCount = list.filter(e => ['Draft', 'Planning', 'Ready'].includes(e.status)).length;
+  const stationsCount = new Set(list.map(e => e.targetStation)).size;
+  const totalQuota = list.reduce((s, e) => s + (e.totalPersonnelQuota || 35), 0);
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold sm:text-2xl">Expeditions</h1>
-        {canEdit && <button className={btnPrimary} onClick={() => setShowCreate(true)}>+ New Expedition</button>}
+    <div className="flex flex-col gap-5">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            OPERATIONS
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            Expeditions Command Hub
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Antarctic & Arctic expedition voyages · Real-time mission logs from central database
+          </p>
+        </div>
+
+        {canEdit && (
+          <button className={btnPrimary} onClick={() => setShowCreate(true)}>
+            + New Expedition
+          </button>
+        )}
       </div>
-      {list.length === 0 && <Empty text="No expeditions yet" />}
-      <div className="grid gap-3 sm:grid-cols-2">
+
+      {/* 4 Mission KPI StatCards */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <StatCard
+          label="Active Missions"
+          value={activeCount}
+          sub={`${plannedCount} in planning stages`}
+          trend="↑ 1"
+          trendType="positive"
+        />
+        <StatCard
+          label="Planned Voyages"
+          value={plannedCount}
+          sub="Pre-departure staging"
+          trend="—"
+          trendType="neutral"
+        />
+        <StatCard
+          label="Stations Deployed"
+          value={stationsCount}
+          sub="Maitri, Bharati, Himadri"
+          trend="↑ 2"
+          trendType="positive"
+        />
+        <StatCard
+          label="Crew Capacity Quota"
+          value={totalQuota}
+          sub="Expeditionary personnel total"
+          trend="Optimal"
+          trendType="positive"
+        />
+      </div>
+
+      {list.length === 0 && <Empty text="No expeditions yet. Click '+ New Expedition' above to register a polar mission." />}
+
+      {/* Modern Expedition Cards Grid */}
+      <div className="grid gap-4 sm:grid-cols-2">
         {list.map(e => (
-          <Card key={e._id} className="p-5 border-l-4 border-l-cyan-500 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between gap-2">
-              <span className="rounded bg-cyan-500/10 px-2 py-0.5 font-mono text-xs font-black text-cyan-600 dark:text-cyan-400">
-                {e.expeditionCode}
-              </span>
-              <Pill value={e.status} />
+          <Card key={e._id} className="p-5 flex flex-col justify-between group">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="rounded-xl bg-blue-50 px-2.5 py-1 font-mono text-xs font-black text-blue-600 dark:bg-blue-500/15 dark:text-blue-400 border border-blue-200/60 dark:border-blue-500/30">
+                  {e.expeditionCode}
+                </span>
+                <Pill value={e.status} />
+              </div>
+              <h3 className="mt-3 text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
+                {e.title}
+              </h3>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">📍 Station: {e.targetStation}</span>
+                <span>•</span>
+                <span>❄️ Season: {e.season || '2026-27'}</span>
+                <span>•</span>
+                <span>👥 Quota: {e.totalPersonnelQuota || 35} crew</span>
+              </div>
             </div>
-            <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white">{e.title}</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              🎯 {e.targetStation} · ❄️ {e.season} · 👥 Quota: {e.totalPersonnelQuota || 35} crew
-            </p>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3.5 dark:border-slate-800">
               <Link
                 to={`/expeditions/${e._id}`}
-                className={`${btnPrimary} !px-3 !py-1.5 text-xs flex items-center gap-1.5`}
+                className={`${btnPrimary} !px-3.5 !py-1.5 text-xs flex items-center gap-1.5`}
               >
-                Enter Mission Workspace →
+                <span>Mission Workspace</span>
+                <span>→</span>
               </Link>
               {canEdit && (
-                <div className="flex items-center gap-1">
-                  <button onClick={() => openEdit(e)} className={`${btnGhost} !px-2.5 !py-1 text-xs`}>Edit</button>
-                  <button onClick={() => { setDeleting(e._id); setError(''); }} className={`${btnGhost} !px-2.5 !py-1 text-xs text-red-500 hover:text-red-600`}>Delete</button>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => openEdit(e)} className={`${btnGhost} !px-2.5 !py-1.5 text-xs`}>
+                    Edit
+                  </button>
+                  <button onClick={() => { setDeleting(e._id); setError(''); }} className={`${btnGhost} !px-2.5 !py-1.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50`}>
+                    Delete
+                  </button>
                 </div>
               )}
             </div>

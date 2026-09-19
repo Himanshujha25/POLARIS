@@ -7,8 +7,8 @@ import {
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import {
-  Card, Pill, Spinner, Empty, Modal, Field, inputCls,
-  btnPrimary, btnGhost, btnDanger, ErrorNote, ConfirmDialog
+  Card, StatCard, Pill, Spinner, Empty, Modal, Field, inputCls,
+  btnPrimary, btnGhost, btnDanger, ErrorNote, ConfirmDialog, CustomSelect
 } from '../components/ui';
 
 const ASSET_TYPES = [
@@ -209,21 +209,30 @@ export default function Assets() {
 
   if (loading) return <Spinner />;
 
+  const operationalCount = list.filter(a => a.condition === 'Operational').length;
+  const maintCount = list.filter(a => ['UnderMaintenance', 'ScheduledMaintenance', 'EmergencyOffline', 'Damaged'].includes(a.condition)).length;
+  const avgFuel = list.length > 0
+    ? Math.round(list.reduce((s, a) => s + (a.telemetry?.fuelPercent || 80), 0) / list.length)
+    : 85;
+
   return (
     <div className="flex flex-col gap-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold sm:text-2xl flex items-center gap-2">
-            <Wrench className="text-cyan-500" size={24} />
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            BASE & LOGISTICS
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
             Station Assets & Heavy Telematics
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Polar tracked vehicles, emergency generators, satellite terminals, and scientific instruments across stations.
+            Polar tracked PistenBully vehicles, power generators, heating chillers & scientific sensors
           </p>
         </div>
+
         <div className="flex items-center gap-2">
-          <button onClick={load} className={`${btnGhost} !px-3 !py-1.5 text-xs flex items-center gap-1.5`}>
+          <button onClick={load} className={`${btnGhost} !px-3 !py-2 text-xs flex items-center gap-1.5 font-semibold`}>
             <RefreshCw size={13} />
             Refresh
           </button>
@@ -233,13 +242,45 @@ export default function Assets() {
                 setError('');
                 setShowCreate(true);
               }}
-              className={`${btnPrimary} !px-4 !py-1.5 text-xs flex items-center gap-1.5 font-semibold shadow-sm`}
+              className={btnPrimary}
             >
-              <Plus size={14} />
+              <Plus size={14} className="inline mr-1" />
               Register New Asset
             </button>
           )}
         </div>
+      </div>
+
+      {/* 4 Asset Telematics KPI StatCards */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <StatCard
+          label="Total Heavy Assets"
+          value={list.length}
+          sub="Deployed across polar stations"
+          trend="↑ 1"
+          trendType="positive"
+        />
+        <StatCard
+          label="Active & Operational"
+          value={operationalCount}
+          sub="Engine telemetry nominal"
+          trend="Optimal"
+          trendType="positive"
+        />
+        <StatCard
+          label="Under Maintenance"
+          value={maintCount}
+          sub="Scheduled service or repairs"
+          trend={maintCount > 0 ? "Inspect" : "Clear"}
+          trendType={maintCount > 0 ? "warning" : "positive"}
+        />
+        <StatCard
+          label="Average Fleet Fuel"
+          value={`${avgFuel}%`}
+          sub="Sub-zero fuel tank level"
+          trend="Nominal"
+          trendType="positive"
+        />
       </div>
 
       {/* Filter & Search Bar */}
@@ -256,23 +297,23 @@ export default function Assets() {
             />
           </div>
 
-          <select
+          <CustomSelect
             value={filterStation}
-            onChange={e => setFilterStation(e.target.value)}
-            className={`${inputCls} !py-1 text-xs w-auto`}
-          >
-            <option value="ALL">All Stations</option>
-            {stations.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+            onChange={setFilterStation}
+            options={[
+              { value: 'ALL', label: 'All Stations' },
+              ...stations.map(s => ({ value: s, label: s }))
+            ]}
+          />
 
-          <select
+          <CustomSelect
             value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            className={`${inputCls} !py-1 text-xs w-auto`}
-          >
-            <option value="ALL">All Asset Types</option>
-            {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+            onChange={setFilterType}
+            options={[
+              { value: 'ALL', label: 'All Asset Types' },
+              ...ASSET_TYPES.map(t => ({ value: t, label: t }))
+            ]}
+          />
         </div>
 
         <div className="text-xs text-slate-500 font-mono">

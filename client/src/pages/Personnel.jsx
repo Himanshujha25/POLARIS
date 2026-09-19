@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV } from '../components/ui';
 
 const STATUSES = ['StationHab', 'FieldResearch', 'InTransit', 'MedicalQuarantine', 'SOS_Alert', 'Returned'];
 
@@ -165,19 +165,73 @@ export default function Personnel() {
 
   if (loading) return <Spinner />;
 
+  const atStationCount = list.filter(p => p.currentStatus === 'StationHab').length;
+  const inFieldCount = list.filter(p => p.currentStatus === 'FieldResearch').length;
+  const inTransitCount = list.filter(p => p.currentStatus === 'InTransit').length;
+  const hypothermiaRiskCount = list.filter(p => p.vitals?.bodyTempC && p.vitals.bodyTempC < 35).length;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-col gap-5">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold sm:text-2xl">Personnel Movement</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{list.length} deployed · check-in from ship, station or field</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            BASE & LOGISTICS
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            Personnel Movement & Safety
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Biometric telemetry, GPS station check-ins & handheld satellite GPX trek tracklogs
+          </p>
         </div>
-        {canDeploy && <button className={btnPrimary} onClick={() => setShowDeploy(true)}>+ Deploy member</button>}
-        <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-1 text-xs'}>Export CSV</button>
+
+        <div className="flex items-center gap-2">
+          {canDeploy && (
+            <button className={btnPrimary} onClick={() => setShowDeploy(true)}>
+              + Deploy Member
+            </button>
+          )}
+          <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-2 text-xs font-semibold'}>
+            Export CSV
+          </button>
+        </div>
       </div>
 
-      {/* Deployment view: kitne / kahan / kaun */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* 4 Personnel KPI StatCards */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <StatCard
+          label="Total Deployed Crew"
+          value={list.length}
+          sub="Active expedition personnel"
+          trend="↑ 2"
+          trendType="positive"
+        />
+        <StatCard
+          label="Station Habitation"
+          value={atStationCount}
+          sub="Maitri, Bharati & Himadri"
+          trend="Optimal"
+          trendType="positive"
+        />
+        <StatCard
+          label="Field Excursions"
+          value={inFieldCount}
+          sub="Scientific glaciology treks"
+          trend="Active"
+          trendType="positive"
+        />
+        <StatCard
+          label="Hypothermia Alerts"
+          value={hypothermiaRiskCount}
+          sub="Body temp < 35°C alert"
+          trend={hypothermiaRiskCount > 0 ? "Alert" : "Clear"}
+          trendType={hypothermiaRiskCount > 0 ? "warning" : "positive"}
+        />
+      </div>
+
+      {/* Deployment Location Summary Cards */}
+      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
         {Object.entries(groups).map(([loc, members]) => (
           <Card key={loc} className="p-3">
             <div className="flex items-center justify-between">

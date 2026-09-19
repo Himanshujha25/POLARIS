@@ -295,99 +295,139 @@ export default function MapView() {
 
       {/* Active Distress Beacon Alarm Banner */}
       {(activeDistress.personnel.length > 0 || activeDistress.alerts.length > 0) && (
-        <div className="p-3.5 rounded-lg border border-red-500 bg-red-500/15 text-red-400 flex flex-wrap items-center justify-between gap-3 shadow-lg animate-pulse">
-          <div className="flex items-center gap-3">
-            <Siren size={24} className="text-red-500 animate-bounce" />
-            <div>
-              <p className="font-extrabold text-sm uppercase tracking-wider text-red-300">
-                🚨 CRITICAL EMERGENCY DISTRESS BEACON ACTIVE
-              </p>
-              <p className="text-xs text-red-200/90 mt-0.5">
-                {activeDistress.personnel.length > 0
-                  ? `Crew member (${activeDistress.personnel.map(p => p.badgeId).join(', ')}) in SOS DISTRESS status!`
-                  : `Dead-man countdown timeout triggered (${activeDistress.alerts.length} active emergency alert)!`}
-              </p>
+        <div className="relative overflow-hidden rounded-2xl border border-rose-200/90 bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-rose-500/30 dark:bg-[#111a2e]">
+          {/* Left ambient accent line */}
+          <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-rose-600 rounded-l-2xl" />
+
+          <div className="flex flex-wrap items-center justify-between gap-4 pl-1">
+            <div className="flex items-center gap-3.5">
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30 shadow-xs">
+                <Siren size={20} className="animate-pulse" />
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                </span>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30">
+                    Active Distress Alarm
+                  </span>
+                  <p className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    Emergency Beacon Signal Detected
+                  </p>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                  {activeDistress.personnel.length > 0 ? (
+                    <>
+                      Crew member{' '}
+                      <span className="rounded-md bg-rose-100/80 px-1.5 py-0.5 font-mono font-bold text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
+                        {activeDistress.personnel.map(p => p.badgeId).join(', ')}
+                      </span>{' '}
+                      is currently transmitting an SOS Distress beacon in the field!
+                    </>
+                  ) : (
+                    `Dead-man countdown timeout triggered (${activeDistress.alerts.length} active emergency alert)!`
+                  )}
+                </p>
+              </div>
             </div>
+
+            <button
+              onClick={() => {
+                const targetP = activeDistress.personnel[0];
+                if (targetP?.currentCoordinates?.lat) {
+                  setFlyTarget({ lat: targetP.currentCoordinates.lat, lng: targetP.currentCoordinates.lng, zoom: 15 });
+                } else if (activeDistress.alerts[0]?.coordinates?.lat) {
+                  setFlyTarget({ lat: activeDistress.alerts[0].coordinates.lat, lng: activeDistress.alerts[0].coordinates.lng, zoom: 15 });
+                }
+              }}
+              className="flex items-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 text-xs font-bold shadow-xs hover:shadow-md active:scale-98 transition-all cursor-pointer shrink-0"
+            >
+              <Crosshair size={14} />
+              <span>Intercept / Locate Beacon</span>
+            </button>
           </div>
-          <button
-            onClick={() => {
-              const targetP = activeDistress.personnel[0];
-              if (targetP?.currentCoordinates?.lat) {
-                setFlyTarget({ lat: targetP.currentCoordinates.lat, lng: targetP.currentCoordinates.lng, zoom: 15 });
-              } else if (activeDistress.alerts[0]?.coordinates?.lat) {
-                setFlyTarget({ lat: activeDistress.alerts[0].coordinates.lat, lng: activeDistress.alerts[0].coordinates.lng, zoom: 15 });
-              }
-            }}
-            className={`${btnDanger} !py-1.5 !px-4 text-xs font-bold flex items-center gap-1.5 shadow-md`}
-          >
-            <Crosshair size={14} />
-            Intercept / Locate Beacon
-          </button>
         </div>
       )}
 
       {/* Crevasse Proximity Radar Alert */}
       {crevasseWarning && (
-        <div className="p-3 rounded-lg border-2 border-amber-500 bg-amber-500/15 text-amber-300 text-xs font-bold flex items-center justify-between shadow-lg animate-pulse">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-amber-400 animate-bounce" />
-            <span>
-              ⚠️ RADAR PROXIMITY ALERT: {crevasseWarning.distance} meters to {crevasseWarning.name}! Halting recommended.
+        <div className="relative overflow-hidden rounded-2xl border border-amber-200/90 bg-white p-3.5 shadow-sm dark:border-amber-500/30 dark:bg-[#111a2e]">
+          <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-amber-500 rounded-l-2xl" />
+          <div className="flex items-center justify-between gap-3 pl-1 text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30">
+                <AlertTriangle size={16} />
+              </div>
+              <div>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  Radar Proximity Warning:
+                </span>{' '}
+                <span className="text-slate-600 dark:text-slate-300">
+                  {crevasseWarning.distance}m to {crevasseWarning.name}. Traverse halt advised.
+                </span>
+              </div>
+            </div>
+            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+              Crevasse Field
             </span>
           </div>
-          <span className="text-[10px] font-mono uppercase bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/40">
-            CREVASSE FIELD NEARBY
-          </span>
         </div>
       )}
 
       {/* Live Device Location Bar */}
       {myPos && (
-        <div className="p-3.5 rounded-lg border border-cyan-500 bg-cyan-950/20 text-xs flex flex-wrap items-center justify-between gap-3 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-[#111a2e]">
+          <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-cyan-500 rounded-l-2xl" />
+          <div className="flex flex-wrap items-center justify-between gap-3 pl-1 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600 border border-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-400 dark:border-cyan-500/30">
+                <LocateFixed size={18} />
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">
+                  <span>Device GPS Lock</span>
+                  <span className="text-[10px] font-mono font-normal text-slate-400 dark:text-slate-500">
+                    (Accuracy: ±{myAccuracy}m)
+                  </span>
+                </div>
+                <div className="text-slate-600 dark:text-slate-300 font-mono text-[11px] mt-0.5 max-w-xl truncate" title={myAddress}>
+                  {myAddress || 'Location determined by GNSS'}
+                </div>
+                <div className="text-[10px] font-mono text-cyan-600 dark:text-cyan-400 mt-0.5">
+                  Lat: {myPos.lat.toFixed(6)}° • Lng: {myPos.lng.toFixed(6)}°
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">
-                <LocateFixed size={15} />
-                Exact Device Position Identified (Accuracy: ±{myAccuracy}m)
-              </div>
-              <div className="text-slate-300 font-mono text-xs mt-0.5 max-w-2xl truncate" title={myAddress}>
-                {myAddress || 'Location determined by GNSS'}
-              </div>
-              <div className="text-[11px] font-mono text-cyan-500/80 mt-0.5">
-                Latitude: {myPos.lat.toFixed(6)}° • Longitude: {myPos.lng.toFixed(6)}°
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setFlyTarget({ lat: myPos.lat, lng: myPos.lng, zoom: 16 })}
-              className={`${btnGhost} !px-3 !py-1 text-xs text-cyan-400 hover:border-cyan-400 font-semibold`}
-            >
-              <Crosshair size={13} className="inline mr-1" />
-              Center on Device
-            </button>
-            <div className="flex items-center gap-1">
-              <select
-                value={targetBadge}
-                onChange={e => setTargetBadge(e.target.value)}
-                className="bg-slate-900 border border-slate-700 text-xs text-cyan-300 rounded px-2 py-1 font-mono font-bold"
-              >
-                {personnel.map(p => (
-                  <option key={p.badgeId} value={p.badgeId}>{p.badgeId} ({p.currentStatus})</option>
-                ))}
-              </select>
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => handleSyncToRoster(targetBadge)}
-                disabled={syncingRoster}
-                className={`${btnPrimary} !px-3.5 !py-1 text-xs font-bold shadow-sm flex items-center gap-1.5`}
+                onClick={() => setFlyTarget({ lat: myPos.lat, lng: myPos.lng, zoom: 16 })}
+                className={`${btnGhost} !px-3 !py-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold`}
               >
-                <Satellite size={13} />
-                {syncingRoster ? 'Broadcasting...' : `📡 Set ${targetBadge} to Device GPS`}
+                <Crosshair size={13} className="inline mr-1" />
+                Center on Device
               </button>
+              <div className="flex items-center gap-1">
+                <select
+                  value={targetBadge}
+                  onChange={e => setTargetBadge(e.target.value)}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-cyan-300 rounded-xl px-2 py-1 font-mono font-bold"
+                >
+                  {personnel.map(p => (
+                    <option key={p.badgeId} value={p.badgeId}>{p.badgeId} ({p.currentStatus})</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleSyncToRoster(targetBadge)}
+                  disabled={syncingRoster}
+                  className={`${btnPrimary} !px-3.5 !py-1 text-xs font-bold shadow-sm flex items-center gap-1.5`}
+                >
+                  <Satellite size={13} />
+                  {syncingRoster ? 'Broadcasting...' : `📡 Set ${targetBadge} to Device GPS`}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Rocket, Package, Boxes, Users, Wrench, Map as MapIcon,
   Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog, KeyRound,
   MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon, Radio,
-  Wind, Thermometer, Volume2, VolumeX, Terminal, WifiOff, RefreshCw
+  Wind, Thermometer, Volume2, VolumeX, Terminal, WifiOff, RefreshCw,
+  ChevronRight, ChevronDown, MessageSquare, Search, Activity, Check
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -12,7 +13,7 @@ import { api } from '../lib/api';
 import { subscribeQueue, syncQueue } from '../lib/offlineQueue';
 import { Modal, Field, inputCls, btnPrimary } from './ui';
 import SearchBox from './SearchBox';
-import QuickDemoBar from './QuickDemoBar';
+import { DEFAULT_ROLES } from './QuickDemoBar';
 import CommandPalette from './CommandPalette';
 import FloatingSOS from './FloatingSOS';
 import { setAudioMuted, getAudioMuted, playRadioChirp } from '../lib/audio';
@@ -63,13 +64,39 @@ function navCls({ isActive }) {
 }
 
 export default function Layout({ children }) {
-  const { user, logout, liveAlerts } = useAuth();
+  const { user, login, logout, liveAlerts } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const [showFeed, setShowFeed] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [pwMsg, setPwMsg] = useState('');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef(null);
+  const [showSidebarRoleMenu, setShowSidebarRoleMenu] = useState(false);
+  const sidebarRoleRef = useRef(null);
+  const [dbUsers, setDbUsers] = useState(DEFAULT_ROLES);
+
+  // Close menus when clicking outside & fetch live DB users
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setShowProfileMenu(false);
+      }
+      if (sidebarRoleRef.current && !sidebarRoleRef.current.contains(e.target)) {
+        setShowSidebarRoleMenu(false);
+      }
+    }
+    if (showProfileMenu || showSidebarRoleMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      api('/api/v1/auth/users')
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) setDbUsers(data);
+        })
+        .catch(() => {});
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfileMenu, showSidebarRoleMenu]);
 
   // Tactical HUD additions
   const [showCmdPalette, setShowCmdPalette] = useState(false);
@@ -131,7 +158,7 @@ export default function Layout({ children }) {
   const allLinks = navSections.flatMap(s => s.links).filter(l => l.roles.includes(user?.role));
 
   return (
-    <div className={`flex min-h-full bg-slate-100 text-slate-900 dark:bg-[#0B111E] dark:text-slate-100 ${isBlizzard ? 'blizzard-mode' : ''}`}>
+    <div className={`flex min-h-full bg-[#f8fafc] text-slate-900 dark:bg-[#0B111E] dark:text-slate-100 ${isBlizzard ? 'blizzard-mode' : ''}`}>
       <CommandPalette
         isOpen={showCmdPalette}
         onClose={setShowCmdPalette}
@@ -140,27 +167,55 @@ export default function Layout({ children }) {
       />
       <FloatingSOS />
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-[#0d1424] md:flex">
-        <div className="mb-4 flex items-center gap-2 px-2 pt-1">
-          <Snowflake className="text-cyan-500" size={26} />
-          <div>
-            <p className="text-base font-extrabold tracking-wide">POLARIS</p>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Expedition Command</p>
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200/80 bg-white p-3.5 dark:border-slate-800 dark:bg-[#0d1424] md:flex">
+        {/* Sidebar Header with 4-Point Star Logo and Collapse Chevron */}
+        <div className="mb-4 flex items-center justify-between px-2 pt-1">
+          <div className="flex items-center gap-2.5">
+            <div className="text-blue-600 dark:text-cyan-400">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.8 8.8C14.3 10.6 15.7 12 17.5 12.5L22 13.5L17.5 14.5C15.7 15 14.3 16.4 13.8 18.2L12 22L10.2 18.2C9.7 16.4 8.3 15 6.5 14.5L2 13.5L6.5 12.5C8.3 12 9.7 10.6 10.2 8.8L12 2Z" fill="currentColor" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-base font-black tracking-wide text-slate-900 dark:text-white">POLARIS</p>
+              <p className="text-[9px] uppercase tracking-widest text-slate-400 dark:text-slate-500 font-bold">Expedition Command</p>
+            </div>
           </div>
+          <button
+            onClick={() => {}}
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors"
+            title="Collapse sidebar"
+          >
+            <ChevronRight size={16} />
+          </button>
         </div>
+
+        {/* Navigation Sections */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-4">
           {navSections.map(sec => {
             const filtered = sec.links.filter(l => l.roles.includes(user?.role));
             if (filtered.length === 0) return null;
             return (
               <div key={sec.title}>
-                <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   {sec.title}
                 </p>
                 <nav className="flex flex-col gap-0.5">
                   {filtered.map(l => (
-                    <NavLink key={l.to} to={l.to} end={l.end} className={navCls}>
-                      <l.icon size={16} /> {l.label}
+                    <NavLink
+                      key={l.to}
+                      to={l.to}
+                      end={l.end}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all ${
+                          isActive
+                            ? 'bg-blue-50/90 text-blue-600 font-semibold dark:bg-blue-600/20 dark:text-blue-400'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
+                        }`
+                      }
+                    >
+                      <l.icon size={17} className="shrink-0" />
+                      <span>{l.label}</span>
                     </NavLink>
                   ))}
                 </nav>
@@ -168,14 +223,89 @@ export default function Layout({ children }) {
             );
           })}
         </div>
-        <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-800/60">
-          <p className="font-semibold">{user?.fullName}</p>
-          <p className="text-slate-500 dark:text-slate-400">{user?.role} · {user?.station}</p>
-          <button onClick={doLogout} className="mt-2 flex items-center gap-1 font-medium text-red-500">
-            <LogOut size={14} /> Logout
+
+        {/* Sidebar Bottom Profile Card with Role Switcher */}
+        <div ref={sidebarRoleRef} className="relative mt-2 flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+          <button
+            type="button"
+            onClick={() => setShowSidebarRoleMenu(v => !v)}
+            className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50/50 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 text-left hover:border-slate-300 dark:hover:border-slate-700 transition-colors cursor-pointer w-full"
+            title="Switch operational role"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900 shrink-0">
+                {user?.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'SA'}
+              </div>
+              <div className="flex flex-col text-left leading-tight">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[110px]">
+                  {user?.fullName || 'SuperAdmin'}
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[110px]">
+                  {user?.role === 'SuperAdmin' ? 'Operations Command' : user?.role || 'Operations Command'}
+                </span>
+              </div>
+            </div>
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${showSidebarRoleMenu ? 'rotate-180' : ''}`} />
           </button>
-          <button onClick={() => { setShowPw(true); setPwMsg(''); }} className="mt-1.5 flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
-            <KeyRound size={14} /> Change password
+
+          {showSidebarRoleMenu && (
+            <div className="absolute bottom-full left-0 mb-2 w-64 rounded-2xl border border-slate-200/90 bg-white p-2 shadow-2xl dark:border-slate-800 dark:bg-[#111a2e] z-[100] animate-in fade-in zoom-in-95 duration-150">
+              <div className="border-b border-slate-100 px-2 pb-1.5 dark:border-slate-800">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Switch Operational Role
+                </p>
+                <p className="text-[10px] text-slate-400">7 PRD Scopes</p>
+              </div>
+              <div className="mt-1 flex flex-col gap-0.5 max-h-56 overflow-y-auto">
+                {dbUsers.map(u => {
+                  const active = user?.username === u.username;
+                  return (
+                    <button
+                      key={u._id || u.username}
+                      type="button"
+                      onClick={async () => {
+                        if (active) return;
+                        setShowSidebarRoleMenu(false);
+                        try {
+                          await login(u.username, 'Test@123');
+                          navigate('/command');
+                        } catch (err) { alert('Failed to switch: ' + err.message); }
+                      }}
+                      className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-left transition-colors cursor-pointer ${
+                        active
+                          ? 'bg-blue-50 text-blue-700 font-bold dark:bg-blue-600/20 dark:text-blue-300'
+                          : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/80'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1 pr-1.5">
+                        <span className="truncate block font-medium">{u.fullName || u.username}</span>
+                        <span className="text-[10px] text-slate-400 block">{u.role}</span>
+                      </div>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
+                        active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                      }`}>{u.role ? u.role.slice(0, 2) : 'OP'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="pt-1.5 mt-1 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  onClick={() => { setShowSidebarRoleMenu(false); setShowPw(true); setPwMsg(''); }}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/80 transition-colors w-full text-left cursor-pointer"
+                >
+                  <KeyRound size={13} className="text-slate-400" />
+                  <span>Change Password</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={doLogout}
+            className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50/60 dark:text-slate-400 dark:hover:bg-red-500/10 dark:hover:text-red-400 cursor-pointer"
+          >
+            <LogOut size={14} />
+            <span>Logout</span>
           </button>
         </div>
       </aside>
@@ -193,61 +323,187 @@ export default function Layout({ children }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top header */}
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-slate-200 bg-white/90 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-[#0d1424]/90 sm:px-4">
+        {/* Row 1: Global Master Header Bar (Search + Quick Tools + Profile Avatar) */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200/80 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-[#0d1424]">
+          {/* Mobile brand */}
           <div className="flex items-center gap-2 md:hidden">
-            <Snowflake className="text-cyan-500" size={22} />
-            <p className="font-extrabold tracking-wide">POLARIS</p>
+            <div className="text-blue-600 dark:text-cyan-400">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.8 8.8C14.3 10.6 15.7 12 17.5 12.5L22 13.5L17.5 14.5C15.7 15 14.3 16.4 13.8 18.2L12 22L10.2 18.2C9.7 16.4 8.3 15 6.5 14.5L2 13.5L6.5 12.5C8.3 12 9.7 10.6 10.2 8.8L12 2Z" fill="currentColor" />
+              </svg>
+            </div>
+            <p className="font-extrabold tracking-wide text-slate-900 dark:text-white">POLARIS</p>
           </div>
 
+          {/* Master Search Bar (with ⌘ K) */}
+          <div
+            onClick={() => setShowCmdPalette(true)}
+            className="flex flex-1 max-w-xl items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-1.5 transition-all hover:border-slate-300 hover:bg-white cursor-pointer dark:border-slate-700/80 dark:bg-slate-800/40 dark:hover:bg-slate-800/80"
+          >
+            <Search size={16} className="text-slate-400 shrink-0" />
+            <span className="flex-1 text-xs text-slate-400 dark:text-slate-500 select-none">
+              Search missions, stations, assets, personnel...
+            </span>
+            <kbd className="hidden sm:inline-flex items-center px-2 py-0.5 text-[10px] font-mono font-medium text-slate-400 bg-white border border-slate-200 rounded-md dark:bg-slate-800 dark:border-slate-700">
+              ⌘ K
+            </kbd>
+          </div>
+
+          {/* Master Top Right Controls */}
+          <div className="flex items-center gap-3 ml-4">
+            {/* Alert Bell with Live Counter Dot */}
+            <button
+              onClick={() => setShowFeed(v => !v)}
+              className="relative p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Live alert notifications"
+            >
+              <Bell size={18} />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
+            </button>
+
+            {/* Messages / Dispatch Icon */}
+            <button
+              onClick={() => navigate('/alerts')}
+              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors hidden sm:block"
+              title="Expedition communications"
+            >
+              <MessageSquare size={18} />
+            </button>
+
+            {/* Dark / Light Theme Toggle */}
+            <button
+              onClick={toggle}
+              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+
+            {/* User Profile Chip with Dropdown */}
+            <div ref={profileMenuRef} className="relative pl-2 border-l border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowProfileMenu(v => !v)}
+                className="flex items-center gap-2 rounded-xl p-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left cursor-pointer"
+                title="Account profile & role switcher"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900 shrink-0">
+                  {user?.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'SA'}
+                </div>
+                <div className="hidden lg:flex flex-col text-left leading-tight">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[130px]">
+                    {user?.fullName || 'SuperAdmin'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[130px]">
+                    {user?.role === 'SuperAdmin' ? 'Operations Command' : user?.role || 'Operations Command'}
+                  </span>
+                </div>
+                <ChevronDown size={14} className={`text-slate-400 hidden lg:block transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showProfileMenu && (
+                <div className="absolute right-0 top-full z-[100] mt-2 w-72 rounded-2xl border border-slate-200/90 bg-white p-2.5 shadow-2xl dark:border-slate-800 dark:bg-[#111a2e] animate-in fade-in zoom-in-95 duration-150">
+                  <div className="border-b border-slate-100 pb-2 px-1 dark:border-slate-800">
+                    <p className="font-bold text-xs text-slate-900 dark:text-white truncate">{user?.fullName}</p>
+                    <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">{user?.role} · {user?.station || 'Polar Command'}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{user?.email || 'officer@polaris.moes.gov.in'}</p>
+                  </div>
+
+                  {/* Switch Role Section */}
+                  <div className="py-2 border-b border-slate-100 dark:border-slate-800">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-1">
+                      Switch Role (7 PRD Roles)
+                    </p>
+                    <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto pr-0.5">
+                      {dbUsers.map(u => {
+                        const active = user?.username === u.username;
+                        return (
+                          <button
+                            key={u._id || u.username}
+                            type="button"
+                            onClick={async () => {
+                              if (active) return;
+                              setShowProfileMenu(false);
+                              try {
+                                await login(u.username, 'Test@123');
+                                navigate('/command');
+                              } catch (err) { alert('Failed to switch: ' + err.message); }
+                            }}
+                            className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-left transition-colors cursor-pointer ${
+                              active
+                                ? 'bg-blue-50 text-blue-700 font-bold dark:bg-blue-600/20 dark:text-blue-300'
+                                : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/80'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1 pr-2">
+                              <p className="font-semibold truncate">{u.fullName || u.username}</p>
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{u.role} · {u.station || 'Base'}</p>
+                            </div>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
+                              active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                            }`}>{u.role ? u.role.slice(0, 2) : 'OP'}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-1.5 flex flex-col gap-1">
+                    <button
+                      onClick={() => { setShowProfileMenu(false); setShowPw(true); setPwMsg(''); }}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/80 transition-colors w-full text-left cursor-pointer"
+                    >
+                      <KeyRound size={13} className="text-slate-400" />
+                      <span>Change Password</span>
+                    </button>
+                    <button
+                      onClick={() => { setShowProfileMenu(false); doLogout(); }}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors w-full text-left cursor-pointer font-semibold"
+                    >
+                      <LogOut size={13} />
+                      <span>Logout Session</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Row 2: Polar Tactical Telemetry & HUD Sub-bar */}
+        <div className="z-20 flex flex-wrap items-center gap-2 border-b border-slate-200/80 bg-white/70 px-4 py-2 backdrop-blur dark:border-slate-800 dark:bg-[#0d1424]/80 text-xs">
           {/* Polar Satellite Link Indicator */}
-          <div className="hidden lg:flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+          <div className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
             <Radio size={12} />
             <span>SAT-LINK: IRIDIUM NEXT</span>
+            <span className="text-emerald-400/80 dark:text-emerald-500/80">•</span>
+            <span className="font-normal text-emerald-600 dark:text-emerald-300">Synced</span>
           </div>
 
-          {/* Offline Sync Outbox Status Indicator */}
-          {!isOnline ? (
-            <button
-              onClick={triggerSync}
-              className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
-              title="Satellite link disconnected. Mutations are queued locally in IndexedDB. Click to retry sync."
-            >
-              <WifiOff size={12} />
-              <span>OFFLINE ({offlineQueueItems.length} queued)</span>
-            </button>
-          ) : offlineQueueItems.length > 0 ? (
-            <button
-              onClick={triggerSync}
-              disabled={isSyncing}
-              className="flex items-center gap-1.5 rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-600 transition-colors hover:bg-cyan-500/20 dark:text-cyan-300"
-              title="Pending mutations queued. Click to sync with central database."
-            >
-              <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
-              <span>SYNC ({offlineQueueItems.length} pending)</span>
-            </button>
-          ) : (
-            <div className="hidden 2xl:flex items-center gap-1 text-[10px] font-medium text-slate-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span>Synced</span>
+          {/* Tactical Weather & Telemetry Pills matching SAT-LINK style */}
+          <div className="hidden xl:flex items-center gap-2">
+            {/* Temperature Pill */}
+            <div className="flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+              <Thermometer size={12} className="text-sky-600 dark:text-sky-400" />
+              <span>-34°C</span>
+              <span className="text-sky-600/70 dark:text-sky-400/70 font-normal text-[10px]">(Chill -48°C)</span>
             </div>
-          )}
 
-          {/* Tactical Weather & Latency HUD Bar */}
-          <div className="hidden xl:flex items-center gap-3 px-3 py-1 rounded-full border border-slate-200 bg-slate-100 text-[11px] font-mono text-slate-600 dark:border-slate-700/60 dark:bg-slate-800/40 dark:text-slate-400">
-            <span className="flex items-center gap-1 font-semibold text-cyan-600 dark:text-cyan-400">
-              <Thermometer size={12} /> -34°C (Chill -48°C)
-            </span>
-            <span className="text-slate-300 dark:text-slate-600">•</span>
-            <span className="flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
-              <Wind size={12} /> 42kt CAT-2 Gale
-            </span>
-            <span className="text-slate-300 dark:text-slate-600">•</span>
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">142ms Lock</span>
+            {/* Wind Pill */}
+            <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+              <Wind size={12} className="text-amber-600 dark:text-amber-400" />
+              <span>42kt CAT-2 Gale</span>
+            </div>
+
+            {/* Latency Pill */}
+            <div className="flex items-center gap-1.5 rounded-full border border-teal-500/30 bg-teal-500/10 px-2.5 py-1 text-[11px] font-semibold text-teal-700 dark:text-teal-300">
+              <Activity size={12} className="text-teal-600 dark:text-teal-400" />
+              <span>142ms Lock</span>
+            </div>
           </div>
 
           <div className="flex-1" />
@@ -255,11 +511,10 @@ export default function Layout({ children }) {
           {/* Command Palette Trigger */}
           <button
             onClick={() => setShowCmdPalette(true)}
-            className="hidden sm:flex items-center gap-2 px-2.5 py-1 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-lg hover:border-cyan-500/60 hover:text-cyan-600 transition-all dark:text-slate-400 dark:bg-slate-800/60 dark:border-slate-700/80 dark:hover:text-cyan-400 dark:hover:border-cyan-500/60"
-            title="Open Command Palette (Ctrl+K or /)"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-all dark:text-slate-400 dark:bg-slate-800/60 dark:border-slate-700/80"
           >
-            <Terminal size={13} className="text-cyan-600 dark:text-cyan-400" />
-            <span className="hidden md:inline">Command</span>
+            <Terminal size={12} className="text-cyan-600 dark:text-cyan-400" />
+            <span>Command</span>
             <kbd className="px-1.5 py-0.2 text-[10px] font-mono bg-slate-200/80 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-400">
               Ctrl+K
             </kbd>
@@ -271,60 +526,32 @@ export default function Layout({ children }) {
               playRadioChirp();
               setIsBlizzard(v => !v);
             }}
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
               isBlizzard
                 ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-extrabold shadow-sm'
-                : 'border-slate-200 bg-slate-100/60 text-slate-600 hover:bg-slate-100 hover:text-cyan-600 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-cyan-400'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-transparent dark:text-slate-400'
             }`}
-            title="Toggle Polar Blizzard High-Contrast Mode for extreme snow visibility"
           >
-            <Snowflake size={13} className={isBlizzard ? 'animate-spin' : ''} />
+            <Snowflake size={12} className={isBlizzard ? 'animate-spin' : ''} />
             <span>Blizzard</span>
           </button>
 
-          {/* Audio Squelch / Siren Mute Toggle */}
+          {/* Audio Mute Toggle */}
           <button
             onClick={toggleAudio}
-            className="rounded-lg border border-slate-200 bg-slate-50/60 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-100"
-            title={muted ? 'Unmute tactical audio & sirens' : 'Mute tactical audio & sirens'}
+            className="rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-transparent dark:text-slate-400"
+            title={muted ? 'Unmute tactical audio' : 'Mute tactical audio'}
           >
-            {muted ? <VolumeX size={18} className="text-red-500 dark:text-red-400" /> : <Volume2 size={18} className="text-cyan-600 dark:text-cyan-400" />}
+            {muted ? <VolumeX size={15} className="text-red-500" /> : <Volume2 size={15} className="text-cyan-600 dark:text-cyan-400" />}
           </button>
 
           <SearchBox />
-          <QuickDemoBar />
-          <button
-            onClick={() => setShowFeed(v => !v)}
-            className="relative rounded-lg border border-slate-200 bg-slate-50/60 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-100"
-            title="Live alert feed"
-          >
-            <Bell size={18} />
-            {liveAlerts.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
-                {liveAlerts.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={toggle}
-            className="rounded-lg border border-slate-200 bg-slate-50/60 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-100"
-            title="Toggle theme"
-          >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <button
-            onClick={doLogout}
-            className="rounded-lg border border-slate-200 bg-slate-50/60 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-400 dark:hover:text-slate-100 md:hidden"
-            title="Logout"
-          >
-            <LogOut size={18} />
-          </button>
-        </header>
+        </div>
 
-        {/* Live feed dropdown */}
+        {/* Live alert dropdown */}
         {showFeed && (
-          <div className="sticky top-[52px] z-30 mx-3 mt-2 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-[#111a2e] sm:mx-4">
-            {liveAlerts.length === 0 && <p className="p-2 text-sm text-slate-500">No live alerts yet. Trigger a simulation from Alerts page.</p>}
+          <div className="sticky top-[104px] z-30 mx-4 mt-2 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-[#111a2e]">
+            {liveAlerts.length === 0 && <p className="p-2 text-sm text-slate-500">No live alerts yet.</p>}
             {liveAlerts.map((a, i) => (
               <div key={a._id || i} className="border-b border-slate-100 p-2 text-sm last:border-0 dark:border-slate-800">
                 <p className="font-semibold">{a.title}</p>
@@ -334,7 +561,7 @@ export default function Layout({ children }) {
           </div>
         )}
 
-        <main className="mx-auto w-full max-w-6xl flex-1 p-3 pb-24 sm:p-4 md:pb-8">{children}</main>
+        <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-24 md:p-6 md:pb-8">{children}</main>
 
         {/* Mobile bottom nav */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 flex gap-1 overflow-x-auto border-t border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-[#0d1424] md:hidden">

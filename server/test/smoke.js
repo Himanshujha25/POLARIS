@@ -217,7 +217,7 @@ function check(name, cond, extra = '') {
   r = await req('POST', `/api/v1/personnel/${person._id}/upload-gpx`, { gpxData: gpxSample });
   check('personnel/upload-gpx', r.status === 200 && r.data.pointsCount === 2, `points=${r.data?.pointsCount}`);
 
-  const rSci = await req('POST', '/api/v1/auth/login', { username: 'rahul', password: 'Test@123' }, false);
+  const rSci = await req('POST', '/api/v1/auth/login', { username: 'commander', password: 'Test@123' }, false);
   const sciToken = rSci.data.token;
   const old = token; token = sciToken;
   r = await req('POST', '/api/v1/auth/register', { username: 'x', email: 'x@x.in', password: 'Test@123', fullName: 'X', role: 'PersonnelOfficer' });

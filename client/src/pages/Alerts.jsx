@@ -3,7 +3,7 @@ import { Siren, FlaskConical } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
 
 export default function Alerts() {
   const { user } = useAuth();
@@ -50,13 +50,65 @@ export default function Alerts() {
 
   if (loading) return <Spinner />;
 
+  const criticalCount = alerts.filter(a => a.severity === 'CRITICAL' || a.severity === 'DISASTER').length;
+  const warningCount = alerts.filter(a => a.severity === 'WARNING').length;
+  const infoCount = alerts.filter(a => a.severity === 'INFO').length;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold sm:text-2xl">Alerts & SOS Center</h1>
-        <button onClick={() => setShowSos(true)} className="flex items-center gap-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500">
-          <Siren size={16} /> Trigger SOS
+    <div className="flex flex-col gap-5">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            OPERATIONS & SAFETY
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            Alerts & SOS Dispatch Center
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Automated environmental triggers, biometric threshold breaches & distress broadcasts
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowSos(true)}
+          className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-xs hover:bg-rose-500 transition-all active:scale-98 cursor-pointer"
+        >
+          <Siren size={16} />
+          <span>Trigger Distress SOS</span>
         </button>
+      </div>
+
+      {/* 4 Alerts KPI StatCards */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <StatCard
+          label="Total Active Alerts"
+          value={alerts.length}
+          sub="Unacknowledged station events"
+          trend={alerts.length > 0 ? "Review" : "Clear"}
+          trendType={alerts.length > 0 ? "warning" : "positive"}
+        />
+        <StatCard
+          label="Critical / Disaster"
+          value={criticalCount}
+          sub="Requires immediate officer signoff"
+          trend={criticalCount > 0 ? "Critical" : "Clear"}
+          trendType={criticalCount > 0 ? "warning" : "positive"}
+        />
+        <StatCard
+          label="Threshold Warnings"
+          value={warningCount}
+          sub="Pre-depletion & telemetry drift"
+          trend="Nominal"
+          trendType="neutral"
+        />
+        <StatCard
+          label="Informational Feeds"
+          value={infoCount}
+          sub="Transit & stage transitions"
+          trend="Optimal"
+          trendType="positive"
+        />
       </div>
 
       <Card className="border-amber-300 p-4 dark:border-amber-700">

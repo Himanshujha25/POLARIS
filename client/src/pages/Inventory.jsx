@@ -3,7 +3,7 @@ import { Plus, Boxes, Package, ShieldCheck, Database, ArrowRightLeft } from 'luc
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV } from '../components/ui';
 
 const INV_CATEGORIES = [
   'Provisions',
@@ -181,13 +181,26 @@ export default function Inventory() {
 
   if (loading) return <Spinner />;
 
+  const criticalCount = items.filter(i => i.currentStock <= i.criticalEmergencyThreshold).length;
+  const warningCount = items.filter(i => i.currentStock <= i.minimumSafeThreshold && i.currentStock > i.criticalEmergencyThreshold).length;
+  const optimalCount = items.filter(i => i.currentStock > i.minimumSafeThreshold).length;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold sm:text-2xl flex items-center gap-2">
-          <Boxes className="text-cyan-500" size={24} />
-          Station Inventory & Life Support
-        </h1>
+    <div className="flex flex-col gap-5">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            BASE & LOGISTICS
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            Central Inventory & Life Support
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Polar consumable depletion forecasting, bunker reserves & emergency life-support rations
+          </p>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           {canEdit && (
             <button
@@ -198,28 +211,100 @@ export default function Inventory() {
                 }
                 setShowAddModal(true);
               }}
-              className={`${btnPrimary} !px-3 !py-1 text-xs flex items-center gap-1.5 font-semibold shadow-sm`}
+              className={btnPrimary}
             >
-              <Plus size={14} />
+              <Plus size={14} className="inline mr-1" />
               Add Stock Item
             </button>
           )}
-          <button onClick={() => setTab('stock')} className={`${btnGhost} !px-3 !py-1 text-xs ${tab === 'stock' ? '!border-cyan-500 !text-cyan-600' : ''}`}>Stock</button>
-          <button onClick={() => setTab('txns')} className={`${btnGhost} !px-3 !py-1 text-xs ${tab === 'txns' ? '!border-cyan-500 !text-cyan-600' : ''}`}>Transactions</button>
-          <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-1 text-xs'}>Export stock CSV</button>
-          {tab === 'txns' && <button onClick={exportTxns} className={btnGhost + ' !px-3 !py-1 text-xs'}>Export txns CSV</button>}
+          <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-2 text-xs font-semibold'}>
+            Export Stock CSV
+          </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => setStationF('')} className={`${btnGhost} !px-3 !py-1 text-xs ${!stationF ? '!border-cyan-500 !text-cyan-600' : ''}`}>
-          All stations
-        </button>
-        {stationOptions.map(s => (
-          <button key={s} onClick={() => setStationF(s)} className={`${btnGhost} !px-3 !py-1 text-xs ${stationF === s ? '!border-cyan-500 !text-cyan-600' : ''}`}>
-            {s}
+      {/* 4 Inventory KPI StatCards */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <StatCard
+          label="Tracked SKU Items"
+          value={items.length}
+          sub="Medical, rations, fuel & spares"
+          trend="↑ 4"
+          trendType="positive"
+        />
+        <StatCard
+          label="Critical Depletions"
+          value={criticalCount}
+          sub="Stock ≤ Emergency Threshold"
+          trend={criticalCount > 0 ? "Critical" : "Clear"}
+          trendType={criticalCount > 0 ? "warning" : "positive"}
+        />
+        <StatCard
+          label="Optimal Reserves"
+          value={optimalCount}
+          sub="Safe operational levels"
+          trend="Optimal"
+          trendType="positive"
+        />
+        <StatCard
+          label="Reorder Warnings"
+          value={warningCount}
+          sub="Under minimum safe threshold"
+          trend={warningCount > 0 ? "Review" : "Nominal"}
+          trendType={warningCount > 0 ? "warning" : "neutral"}
+        />
+      </div>
+
+      {/* View Tabs & Station Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setTab('stock')}
+            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              tab === 'stock'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300'
+            }`}
+          >
+            Station Stock
           </button>
-        ))}
+          <button
+            onClick={() => setTab('txns')}
+            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              tab === 'txns'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300'
+            }`}
+          >
+            Audit Transactions
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setStationF('')}
+            className={`rounded-xl px-3 py-1 text-xs font-medium transition-all ${
+              !stationF
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-bold'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400'
+            }`}
+          >
+            All Stations
+          </button>
+          {stationOptions.map(s => (
+            <button
+              key={s}
+              onClick={() => setStationF(s)}
+              className={`rounded-xl px-3 py-1 text-xs font-medium transition-all ${
+                stationF === s
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-bold'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'stock' && (

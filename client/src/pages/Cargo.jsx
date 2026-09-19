@@ -3,7 +3,7 @@ import { Search, QrCode, ShieldAlert, Printer } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
 import { generateLogisticsCodeSVG } from '../lib/qrCode';
 
 const NODES = ['NCPOR_Goa', 'Mumbai_Port', 'Cape_Town_Hub', 'Research_Vessel', 'Ice_Shelf_Barrier', 'Bharati_Station', 'Maitri_Station'];
@@ -152,31 +152,110 @@ export default function Cargo() {
 
   if (loading) return <Spinner />;
 
+  const inTransitCount = list.filter(c => c.status === 'InTransit').length;
+  const deliveredCount = list.filter(c => c.status === 'DeliveredStation').length;
+  const hazmatCount = list.filter(c => c.isHazmat).length;
+  const totalWeight = list.reduce((s, c) => s + (c.weightKg || 0), 0);
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold sm:text-2xl">Cargo Tracking</h1>
-        {canEdit && <button className={btnPrimary} onClick={() => setShowCreate(true)}>+ Register Cargo</button>}
+    <div className="flex flex-col gap-5">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            BASE & LOGISTICS
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            Cargo Manifests & Custody
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            ISO polar containers, customs declarations & tamper-proof barcode seal tracking
+          </p>
+        </div>
+
+        {canEdit && (
+          <button className={btnPrimary} onClick={() => setShowCreate(true)}>
+            + Register Cargo Container
+          </button>
+        )}
       </div>
 
+      {/* 4 Logistics KPI StatCards */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <StatCard
+          label="Total Cargo Units"
+          value={list.length}
+          sub={`${totalWeight.toLocaleString()} kg manifest payload`}
+          trend="↑ 2"
+          trendType="positive"
+        />
+        <StatCard
+          label="In Sea / Air Transit"
+          value={inTransitCount}
+          sub="Vessel & airlift en route"
+          trend="—"
+          trendType="neutral"
+        />
+        <StatCard
+          label="Delivered Stations"
+          value={deliveredCount}
+          sub="Bharati & Maitri inventory"
+          trend="Optimal"
+          trendType="positive"
+        />
+        <StatCard
+          label="HAZMAT Cryo / Fuel"
+          value={hazmatCount}
+          sub="Class 3 & Class 9 sealed"
+          trend={hazmatCount > 0 ? "Inspect" : "Clear"}
+          trendType={hazmatCount > 0 ? "warning" : "positive"}
+        />
+      </div>
+
+      {/* Search & Barcode Lookup Card */}
       <Card className="p-3">
         <form onSubmit={lookup} className="flex gap-2">
-          <input className={inputCls} placeholder="QR / tracking no. e.g. CRG-2027-BHR-001" value={track} onChange={e => setTrack(e.target.value)} />
-          <button className={btnPrimary} aria-label="Track"><Search size={18} /></button>
+          <input
+            className={inputCls}
+            placeholder="Scan barcode / enter tracking or container no. e.g. CRG-CONT-44-FUEL..."
+            value={track}
+            onChange={e => setTrack(e.target.value)}
+          />
+          <button className={btnPrimary} aria-label="Track">
+            <Search size={16} />
+          </button>
         </form>
         {tracked && (
-          <div className="mt-2 rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/50">
-            {tracked.error ? <p className="text-red-500">{tracked.error}</p> : (
-              <p><b>{tracked.trackingNumber}</b> · {tracked.title} · <Pill value={tracked.status} /> · {tracked.currentNode}</p>
+          <div className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+            {tracked.error ? (
+              <p className="text-rose-500 font-semibold">{tracked.error}</p>
+            ) : (
+              <p className="flex items-center gap-2">
+                <span className="font-mono font-bold text-blue-600 dark:text-cyan-400">{tracked.trackingNumber}</span>
+                <span>·</span>
+                <span className="font-medium text-slate-800 dark:text-slate-100">{tracked.title}</span>
+                <span>·</span>
+                <Pill value={tracked.status} />
+                <span className="text-slate-500 text-xs">({tracked.currentNode})</span>
+              </p>
             )}
           </div>
         )}
       </Card>
 
-      <div className="flex gap-2 overflow-x-auto">
+      {/* Filter Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {['', 'Staged', 'InTransit', 'DeliveredStation', 'DelayedWeather'].map(s => (
-          <button key={s} onClick={() => setStatusF(s)} className={`${btnGhost} whitespace-nowrap !px-3 !py-1 text-xs ${statusF === s ? '!border-cyan-500 !text-cyan-600' : ''}`}>
-            {s || 'All'}
+          <button
+            key={s}
+            onClick={() => setStatusF(s)}
+            className={`whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              statusF === s
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300'
+            }`}
+          >
+            {s === '' ? 'All Containers' : s === 'DeliveredStation' ? 'Delivered Station' : s}
           </button>
         ))}
       </div>

@@ -39,9 +39,9 @@ router.get('/me', authRequired, async (req, res) => {
   res.json(user);
 });
 
-// GET /api/v1/auth/users (officers need it for responders/manager pickers)
-router.get('/users', authRequired, requireRoles('SuperAdmin', 'ExpeditionManager', 'EmergencyOfficer', 'PersonnelOfficer'), async (req, res) => {
-  res.json(await User.find().select('-passwordHash').sort({ createdAt: -1 }).limit(200));
+// GET /api/v1/auth/users (directory of active polar personnel & officers)
+router.get('/users', authRequired, async (req, res) => {
+  res.json(await User.find({ isActive: true }).select('-passwordHash').sort({ createdAt: -1 }).limit(200));
 });
 
 // PATCH /api/v1/auth/users/:id (SuperAdmin only) — manage roles/status

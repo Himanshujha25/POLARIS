@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
 
 const TYPES = ['Station', 'Warehouse', 'Camp', 'Vessel', 'Port', 'Hub', 'Aircraft', 'Temporary', 'Headquarters'];
 
@@ -95,18 +95,67 @@ export default function Locations() {
 
   if (loading) return <Spinner />;
 
+  const stationsCount = list.filter(l => l.type === 'Station').length;
+  const campsCount = list.filter(l => l.type === 'Camp').length;
+  const hubsCount = list.filter(l => l.type === 'Hub').length;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-5">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold sm:text-2xl">Locations</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Stations, camps, vessels, hubs — resupply dates drive forecasts</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            BASE & LOGISTICS
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            Base Stations & Mapped Hubs
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Maitri, Bharati, Himadri, staging ports, seasonal field camps & resupply dates
+          </p>
         </div>
-        {canEdit && <button className={btnPrimary} onClick={() => setShow(true)}>+ Add location</button>}
+
+        {canEdit && (
+          <button className={btnPrimary} onClick={() => setShow(true)}>
+            + Register Outpost / Station
+          </button>
+        )}
       </div>
 
-      {list.length === 0 && <Empty />}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* 4 Location KPI StatCards */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <StatCard
+          label="Total Polar Outposts"
+          value={list.length}
+          sub="Stations, camps, ports & vessels"
+          trend="↑ 1"
+          trendType="positive"
+        />
+        <StatCard
+          label="Permanent Stations"
+          value={stationsCount}
+          sub="Year-round polar bases"
+          trend="Active"
+          trendType="positive"
+        />
+        <StatCard
+          label="Field Camps"
+          value={campsCount}
+          sub="Seasonal excursion bases"
+          trend="Nominal"
+          trendType="neutral"
+        />
+        <StatCard
+          label="Transit & Supply Hubs"
+          value={hubsCount}
+          sub="Cape Town & Goa depots"
+          trend="Connected"
+          trendType="positive"
+        />
+      </div>
+
+      {list.length === 0 && <Empty text="No stations registered yet." />}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {list.map(l => (
           <Card key={l._id} className="p-4 text-sm">
             <div className="flex items-center justify-between gap-2">

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
+import { Card, StatCard, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, btnDanger } from '../components/ui';
 
 const TYPES = ['Medical', 'Fire', 'VehicleEquipment', 'Communication', 'Supply', 'WeatherEnvironment', 'Personnel', 'Other'];
 const SEVS = ['Low', 'Medium', 'High', 'Critical'];
@@ -76,16 +76,86 @@ export default function Incidents() {
 
   if (loading) return <Spinner />;
 
+  const activeCount = list.filter(i => !['Resolved', 'Closed'].includes(i.status)).length;
+  const criticalCount = list.filter(i => ['Critical', 'Disaster', 'High'].includes(i.severity)).length;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold sm:text-2xl">Emergency Incidents</h1>
-        {canCreate && <button className={btnPrimary} onClick={() => setShow(true)}>+ Report incident</button>}
+    <div className="flex flex-col gap-5">
+      {/* Category Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            OPERATIONS & SAFETY
+          </p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            Emergency Response & Incident Command
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Polar SAR search & rescue, automated station roll-call muster & medical casualty triage
+          </p>
+        </div>
+
+        {canCreate && (
+          <button className={btnDanger} onClick={() => setShow(true)}>
+            + Report Emergency Incident
+          </button>
+        )}
       </div>
 
+      {/* 4 Emergency KPI StatCards */}
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <StatCard
+          label="Active Incidents"
+          value={activeCount}
+          sub="Ongoing SAR & field responses"
+          trend={activeCount > 0 ? "Active" : "Clear"}
+          trendType={activeCount > 0 ? "warning" : "positive"}
+        />
+        <StatCard
+          label="Critical / High Severity"
+          value={criticalCount}
+          sub="Immediate life-safety priority"
+          trend={criticalCount > 0 ? "Priority" : "Nominal"}
+          trendType={criticalCount > 0 ? "warning" : "positive"}
+        />
+        <StatCard
+          label="SAR Responders Assigned"
+          value={users.length}
+          sub="Medical & search team ready"
+          trend="Ready"
+          trendType="positive"
+        />
+        <StatCard
+          label="Rescue Vehicles Ready"
+          value={assets.length}
+          sub="PistenBully & snowmobiles"
+          trend="Optimal"
+          trendType="positive"
+        />
+      </div>
+
+      {/* Active Filter Tabs */}
       <div className="flex gap-2">
-        <button onClick={() => setShowActive(true)} className={`${btnGhost} !px-3 !py-1 text-xs ${showActive ? '!border-cyan-500 !text-cyan-600' : ''}`}>Active</button>
-        <button onClick={() => setShowActive(false)} className={`${btnGhost} !px-3 !py-1 text-xs ${!showActive ? '!border-cyan-500 !text-cyan-600' : ''}`}>All incl. history</button>
+        <button
+          onClick={() => setShowActive(true)}
+          className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+            showActive
+              ? 'bg-rose-600 text-white shadow-xs'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300'
+          }`}
+        >
+          Active Incidents
+        </button>
+        <button
+          onClick={() => setShowActive(false)}
+          className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+            !showActive
+              ? 'bg-rose-600 text-white shadow-xs'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300'
+          }`}
+        >
+          All (Including Resolved History)
+        </button>
       </div>
 
       {list.length === 0 && <Empty text={showActive ? 'No active incidents — all clear' : 'No incidents yet'} />}
