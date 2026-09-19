@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Rocket, Package, Boxes, Users, Wrench, Map as MapIcon,
   Siren, Sun, Moon, LogOut, Snowflake, Bell, UserCog, KeyRound,
   MapPin, Flame, FileBarChart, BarChart3, ScrollText, Settings as SettingsIcon, Radio,
-  Wind, Thermometer, Volume2, VolumeX, Terminal
+  Wind, Thermometer, Volume2, VolumeX, Terminal, WifiOff, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { api } from '../lib/api';
+import { subscribeQueue, syncQueue } from '../lib/offlineQueue';
 import { Modal, Field, inputCls, btnPrimary } from './ui';
 import SearchBox from './SearchBox';
 import QuickDemoBar from './QuickDemoBar';
@@ -75,6 +76,39 @@ export default function Layout({ children }) {
   // Tactical HUD additions
   const [showCmdPalette, setShowCmdPalette] = useState(false);
   const [muted, setMuted] = useState(getAudioMuted());
+
+  // Offline Outbox Sync Engine
+  const [offlineQueueItems, setOfflineQueueItems] = useState([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeQueue(setOfflineQueueItems);
+    const handleOnline = () => {
+      setIsOnline(true);
+      triggerSync();
+    };
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      unsub();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const triggerSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await syncQueue(api);
+    } catch (err) {
+      console.warn('[Sync] Notice:', err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const toggleAudio = () => {
     const next = !muted;

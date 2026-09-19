@@ -1,14 +1,18 @@
-// POLARIS Offline Outbox & IndexedDB Synchronization Engine
-// Ensures uninterrupted field operations when polar satellite connectivity (Iridium/Starlink) is severed.
+// POLARIS Offline Outbox & Sync Queue Engine (IndexedDB)
+// Enables polar field operations to queue mutations when disconnected from satellite link
 
 const DB_NAME = 'polaris_offline_db';
-const STORE_NAME = 'mutation_queue';
 const DB_VERSION = 1;
+const STORE_NAME = 'outbox_queue';
+
+let dbPromise = null;
+const listeners = new Set();
 
 function openDB() {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !window.indexedDB) {
-      return reject(new Error('IndexedDB not supported'));
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      return reject(new Error('IndexedDB not supported in this environment'));
     }
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = (e) => {
@@ -20,42 +24,51 @@ function openDB() {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+  return dbPromise;
 }
 
-/**
- * Queue a mutation when offline or when an API call fails due to network severance.
- */
-export async function enqueueMutation({ url, method = 'POST', body = {}, title = 'Offline Action' }) {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const record = {
-        url,
-        method,
-        body,
-        title,
-        createdAt: new Date().toISOString(),
-        status: 'PENDING'
-      };
-      const req = store.add(record);
-      req.onsuccess = () => {
-        window.dispatchEvent(new CustomEvent('polaris:offline-queue-updated'));
-        resolve(req.result);
-      };
-      req.onerror = () => reject(req.error);
+export function subscribeQueue(fn) {
+  listeners.add(fn);
+  getQueue().then(fn).catch(() => {});
+  return () => listeners.delete(fn);
+}
+
+function notifyListeners() {
+  getQueue().then((q) => {
+    listeners.forEach((fn) => {
+      try { fn(q); } catch {}
     });
-  } catch (err) {
-    console.error('Failed to enqueue offline mutation:', err);
-    return null;
+  }).catch(() => {});
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('polaris:offline-queue-updated'));
   }
 }
 
-/**
- * Get all pending mutations currently buffered in IndexedDB.
- */
-export async function getQueuedMutations() {
+export async function enqueueRequest({ path, url, method = 'POST', body, headers, title }) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const item = {
+      path: path || url,
+      method: (method || 'POST').toUpperCase(),
+      body,
+      headers: headers || {},
+      title: title || `${(method || 'POST').toUpperCase()} ${(path || url || '').replace('/api/v1/', '')}`,
+      queuedAt: new Date().toISOString()
+    };
+    const req = store.add(item);
+    req.onsuccess = () => {
+      notifyListeners();
+      resolve({ id: req.result, ...item });
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export const enqueueMutation = enqueueRequest;
+
+export async function getQueue() {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -70,54 +83,49 @@ export async function getQueuedMutations() {
   }
 }
 
-/**
- * Remove a successfully dispatched mutation from the queue.
- */
-export async function removeMutation(id) {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.delete(id);
-      req.onsuccess = () => {
-        window.dispatchEvent(new CustomEvent('polaris:offline-queue-updated'));
-        resolve(true);
-      };
-      req.onerror = () => reject(req.error);
-    });
-  } catch {
-    return false;
-  }
+export const getQueuedMutations = getQueue;
+
+export async function removeQueueItem(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.delete(id);
+    req.onsuccess = () => {
+      notifyListeners();
+      resolve(true);
+    };
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/**
- * Synchronize all pending mutations with the backend API in FIFO sequence.
- */
-export async function syncOfflineQueue(api) {
-  if (!navigator.onLine) return { synced: 0, failed: 0, pending: 0 };
-  const queue = await getQueuedMutations();
-  if (queue.length === 0) return { synced: 0, failed: 0, pending: 0 };
+export const removeMutation = removeQueueItem;
+
+export async function syncQueue(apiCaller) {
+  const items = await getQueue();
+  if (items.length === 0) return { synced: 0, failed: 0, remaining: 0 };
 
   let synced = 0;
   let failed = 0;
 
-  for (const item of queue) {
+  for (const item of items) {
     try {
-      await api(item.url, {
+      await apiCaller(item.path, {
         method: item.method,
-        body: item.body
+        body: item.body,
+        _skipOfflineQueue: true
       });
-      await removeMutation(item.id);
+      await removeQueueItem(item.id);
       synced++;
     } catch (err) {
-      console.warn(`Failed to sync queued action #${item.id} (${item.title}):`, err);
+      console.warn('[OfflineQueue] Replay failed for item:', item.id, err.message);
       failed++;
-      // Stop on auth error or server-down so we preserve order
-      if (err.status === 401 || err.status === 503) break;
+      if (!navigator.onLine) break;
     }
   }
 
-  window.dispatchEvent(new CustomEvent('polaris:offline-queue-updated'));
-  return { synced, failed, remaining: queue.length - synced };
+  notifyListeners();
+  return { synced, failed, remaining: items.length - synced };
 }
+
+export const syncOfflineQueue = syncQueue;

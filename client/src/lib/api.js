@@ -1,4 +1,4 @@
-import { enqueueMutation } from './offlineQueue';
+import { enqueueRequest } from './offlineQueue';
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -6,10 +6,12 @@ export function getToken() {
   return localStorage.getItem('polaris_token');
 }
 
-export async function api(path, { method = 'GET', body } = {}) {
+export async function api(path, { method = 'GET', body, _skipOfflineQueue = false } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   const token = getToken();
   if (token) headers.Authorization = 'Bearer ' + token;
+
+  const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method.toUpperCase());
 
   try {
     const res = await fetch(BASE + path, {
@@ -26,17 +28,20 @@ export async function api(path, { method = 'GET', body } = {}) {
       throw err;
     }
     return data;
-  } catch (netErr) {
-    // If it is a network drop (offline), buffer mutating requests to IndexedDB outbox
-    const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method.toUpperCase());
-    if (isMutation && (!navigator.onLine || netErr.message?.includes('fetch') || netErr.name === 'TypeError')) {
-      const title = `${method.toUpperCase()} ${path.split('?')[0].replace('/api/v1/', '')}`;
-      await enqueueMutation({ url: path, method, body, title });
-      console.info(`[POLARIS Offline Engine] Buffered mutation to IndexedDB outbox: ${title}`);
-      // Return optimistic simulated response for offline UX
-      return { _offlineQueued: true, message: 'Saved to Polar Offline Outbox. Will sync automatically on satellite link.' };
+  } catch (err) {
+    // If it's a network failure or fetch abort and not skipped, queue mutations for offline sync
+    const isNetworkError = !navigator.onLine || err.message === 'Failed to fetch' || err.name === 'TypeError';
+    if (isMutation && !_skipOfflineQueue && isNetworkError) {
+      console.warn('[POLARIS] Network offline. Queuing operation to IndexedDB:', path, method);
+      const queued = await enqueueRequest({ path, method, body, headers });
+      return {
+        _offline: true,
+        _queuedId: queued.id,
+        message: 'Saved to local offline queue. Will sync automatically when satellite connection returns.',
+        ...(body || {})
+      };
     }
-    throw netErr;
+    throw err;
   }
 }
 

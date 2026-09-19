@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
+<<<<<<< HEAD
 import { Search, Biohazard, Printer, Box, ShieldCheck, Package, ScanLine } from 'lucide-react';
+=======
+import { Search, QrCode, ShieldAlert, Printer } from 'lucide-react';
+>>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
+<<<<<<< HEAD
 import ContainerLabelModal from '../components/ContainerLabelModal';
 import ImageOcrUploader from '../components/ImageOcrUploader';
+=======
+import { generateLogisticsCodeSVG } from '../lib/qrCode';
+>>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
 
 const NODES = ['NCPOR_Goa', 'Mumbai_Port', 'Cape_Town_Hub', 'Research_Vessel', 'Ice_Shelf_Barrier', 'Bharati_Station', 'Maitri_Station'];
 
@@ -18,13 +26,18 @@ export default function Cargo() {
   const [track, setTrack] = useState('');
   const [tracked, setTracked] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [qrModalCargo, setQrModalCargo] = useState(null);
   const [form, setForm] = useState({
     trackingNumber: '',
+    containerNumber: '',
+    sealNumber: '',
     title: '',
     category: 'Provisions',
     weightKg: 100,
+    tareWeightKg: '',
     expeditionId: '',
     isHazmat: false,
+<<<<<<< HEAD
     containerNumber: '',
     sealNumber: '',
     containerType: '20ft_Standard',
@@ -32,6 +45,11 @@ export default function Cargo() {
     itemsText: '',
     imageUrl: '',
     ocrExtractedText: ''
+=======
+    hazmatClass: '',
+    customsDeclarationNumber: '',
+    itemsText: ''
+>>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
   });
   const [printCargo, setPrintCargo] = useState(null);
   const [timeline, setTimeline] = useState(null);
@@ -240,10 +258,23 @@ export default function Cargo() {
       <div className="grid gap-3 lg:grid-cols-2">
         {list.map(c => (
           <Card key={c._id} className="p-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-bold">{c.trackingNumber}</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="font-bold">{c.trackingNumber}</p>
+                {c.containerNumber && (
+                  <span className="rounded bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-cyan-700 dark:text-cyan-300 border border-cyan-500/30">
+                    CONT: {c.containerNumber}
+                  </span>
+                )}
+                {c.sealNumber && (
+                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                    🔒 SEAL: {c.sealNumber}
+                  </span>
+                )}
+              </div>
               <Pill value={c.status} />
             </div>
+<<<<<<< HEAD
             <div className="flex flex-wrap items-center gap-2 text-sm mt-0.5">
               <span className="font-semibold text-slate-800 dark:text-slate-200">{c.title}</span>
               <span className="text-slate-400">•</span>
@@ -258,6 +289,26 @@ export default function Cargo() {
                 </span>
               )}
             </div>
+=======
+
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <span className="font-medium">{c.title}</span>
+              <span>·</span>
+              <span>{c.weightKg} kg</span>
+              {c.isHazmat && (
+                <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-400">
+                  <ShieldAlert size={12} /> HAZMAT {c.hazmatClass ? `(${c.hazmatClass})` : ''}
+                </span>
+              )}
+            </div>
+
+            {c.customsDeclarationNumber && (
+              <p className="mt-0.5 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                Customs Ref: {c.customsDeclarationNumber}
+              </p>
+            )}
+
+>>>>>>> 840a1ffe9b50f745c567833346f598ad8d08e008
             {c.items && c.items.length > 0 && (
               <div className="mt-1.5 rounded bg-slate-50 p-2 text-xs dark:bg-slate-800/40">
                 <p className="font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -309,6 +360,9 @@ export default function Cargo() {
             <p className="mt-1 text-xs text-slate-500">NCPOR Goa → Port → Ship → Ice Shelf → Station</p>
             <p className="text-xs font-medium text-cyan-600 dark:text-cyan-400">Now: {c.currentNode} · ETA {c.eta ? new Date(c.eta).toLocaleDateString() : '—'}</p>
             <div className="mt-2 flex flex-wrap gap-2">
+              <button onClick={() => setQrModalCargo(c)} className={btnGhost + ' !px-2.5 !py-1 text-xs flex items-center gap-1 text-cyan-600 dark:text-cyan-400'}>
+                <QrCode size={13} /> QR Seal
+              </button>
               <button onClick={() => openTimeline(c)} className={btnGhost + ' !px-3 !py-1 text-xs'}>Timeline</button>
               <button
                 type="button"
@@ -337,8 +391,9 @@ export default function Cargo() {
       </div>
 
       {showCreate && (
-        <Modal title="Register Cargo & Manifest" onClose={() => setShowCreate(false)}>
+        <Modal title="Register ISO Container & Cargo Manifest" onClose={() => setShowCreate(false)}>
           <form onSubmit={create} className="flex flex-col gap-3">
+<<<<<<< HEAD
             <Field label="Tracking Number / QR">
               <input
                 className={inputCls}
@@ -432,15 +487,17 @@ export default function Cargo() {
                   <option>Provisions</option><option>HazardousFuel</option><option>ScientificInstruments</option><option>HeavySpares</option><option>MedicalLifeSupport</option>
                 </select>
               </Field>
-              <Field label="Total Weight (kg)">
+              <Field label="Gross Cargo Weight (kg)">
                 <input type="number" className={inputCls} required value={form.weightKg} onChange={e => setForm({ ...form, weightKg: e.target.value })} />
               </Field>
             </div>
+
             <Field label="Expedition Mission">
               <select className={inputCls} value={form.expeditionId} onChange={e => setForm({ ...form, expeditionId: e.target.value })}>
                 {exps.map(x => <option key={x._id} value={x._id}>{x.expeditionCode}</option>)}
               </select>
             </Field>
+
             <Field label="Itemized Manifest (e.g. Arctic Rations: 300 Kilograms, Freeze Dried Meals: 150 Units)">
               <textarea
                 className={inputCls}
@@ -450,20 +507,77 @@ export default function Cargo() {
                 onChange={e => setForm({ ...form, itemsText: e.target.value })}
               />
             </Field>
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
-              <input
-                type="checkbox"
-                checked={form.isHazmat}
-                onChange={e => setForm({ ...form, isHazmat: e.target.checked })}
-                className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-              />
-              <span className="inline-flex items-center gap-1.5">
-                <Biohazard size={14} className="text-amber-500 shrink-0" />
-                <span>Classify as Hazardous Material (HAZMAT: Polar Fuel, Batteries, Cryogenics)</span>
-              </span>
-            </label>
+
+            <div className="rounded-lg border border-slate-200 p-2.5 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.isHazmat}
+                  onChange={e => setForm({ ...form, isHazmat: e.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                />
+                <span className="inline-flex items-center gap-1.5">
+                  <Biohazard size={14} className="text-amber-500 shrink-0" />
+                  <span>Classify as Hazardous Material (HAZMAT: Polar Fuel, Batteries, Cryogenics)</span>
+                </span>
+              </label>
+              {form.isHazmat && (
+                <Field label="HAZMAT Classification / Class">
+                  <input
+                    className={inputCls}
+                    placeholder="e.g. Class 3 Flammable Liquid (HSD) or Class 9 Lithium Batteries"
+                    value={form.hazmatClass || ''}
+                    onChange={e => setForm({ ...form, hazmatClass: e.target.value })}
+                  />
+                </Field>
+              )}
+            </div>
+
+            {error && (
+              <div className="rounded-lg p-2.5 text-xs bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 font-medium">
+                {error}
+              </div>
+            )}
+
             <button className={btnPrimary}>Register Cargo Manifest</button>
           </form>
+        </Modal>
+      )}
+
+      {/* Container QR & Seal Code Modal */}
+      {qrModalCargo && (
+        <Modal title={`Container Seal & QR: ${qrModalCargo.trackingNumber}`} onClose={() => setQrModalCargo(null)}>
+          <div className="flex flex-col items-center gap-3 p-2 text-center">
+            <div
+              className="rounded-xl border-2 border-slate-800 p-3 shadow-inner bg-white"
+              dangerouslySetInnerHTML={{
+                __html: generateLogisticsCodeSVG(
+                  qrModalCargo.qrPayload || `${qrModalCargo.trackingNumber}|${qrModalCargo.containerNumber || 'C0'}|${qrModalCargo.sealNumber || 'S0'}`
+                )
+              }}
+            />
+            <div className="text-left w-full space-y-1 rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-800/50 font-mono">
+              <p><b>TRACKING:</b> {qrModalCargo.trackingNumber}</p>
+              <p><b>CONTAINER:</b> {qrModalCargo.containerNumber || 'UNCONTAINERIZED PALLET'}</p>
+              <p><b>SEAL NO:</b> {qrModalCargo.sealNumber || 'N/A'}</p>
+              <p><b>HAZMAT:</b> {qrModalCargo.isHazmat ? `YES (${qrModalCargo.hazmatClass || 'Class 3'})` : 'NO'}</p>
+              <p><b>CURRENT NODE:</b> {qrModalCargo.currentNode}</p>
+            </div>
+            <div className="flex gap-2 w-full mt-2">
+              <button
+                onClick={() => window.print()}
+                className={btnGhost + ' flex-1 flex items-center justify-center gap-1.5'}
+              >
+                <Printer size={14} /> Print Barcode Label
+              </button>
+              <button
+                onClick={() => setQrModalCargo(null)}
+                className={btnPrimary + ' flex-1'}
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 

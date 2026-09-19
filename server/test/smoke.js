@@ -189,6 +189,34 @@ function check(name, cond, extra = '') {
   check('analytics', r.status === 200 && r.data.cargo !== undefined, `status=${r.status}`);
   r = await req('GET', '/api/v1/audit-logs');
   check('audit-logs', r.status === 200 && Array.isArray(r.data), `count=${r.data?.length}`);
+
+  // New Production Modules: Containers, Seals & GPX Trek Upload
+  r = await req('POST', '/api/v1/cargo', {
+    expeditionId: expId,
+    title: 'Smoke ISO Container',
+    category: 'HazardousFuel',
+    trackingNumber: 'CRG-CONT-' + Date.now(),
+    containerNumber: 'IN-NCPOR-44-C99',
+    sealNumber: 'SEAL-99881',
+    isHazmat: true,
+    hazmatClass: 'Class 3 Flammable Liquid',
+    weightKg: 3500
+  });
+  check('cargo/container-seal-create', r.status === 201 && r.data?.containerNumber === 'IN-NCPOR-44-C99' && r.data?.sealNumber === 'SEAL-99881');
+
+  r = await req('GET', '/api/v1/cargo?containerNumber=IN-NCPOR-44-C99');
+  check('cargo/container-filter', r.status === 200 && r.data.length > 0 && r.data[0].containerNumber === 'IN-NCPOR-44-C99', `status=${r.status} len=${r.data?.length}`);
+
+  const gpxSample = `<?xml version="1.0" encoding="UTF-8"?>
+  <gpx version="1.1" creator="Garmin inReach">
+    <trk><name>Bharati Plateau Trek</name><trkseg>
+      <trkpt lat="-69.405" lon="76.185"><ele>42.5</ele><time>2026-09-19T08:00:00Z</time></trkpt>
+      <trkpt lat="-69.410" lon="76.190"><ele>45.0</ele><time>2026-09-19T08:30:00Z</time></trkpt>
+    </trkseg></trk>
+  </gpx>`;
+  r = await req('POST', `/api/v1/personnel/${person._id}/upload-gpx`, { gpxData: gpxSample });
+  check('personnel/upload-gpx', r.status === 200 && r.data.pointsCount === 2, `points=${r.data?.pointsCount}`);
+
   const rSci = await req('POST', '/api/v1/auth/login', { username: 'rahul', password: 'Test@123' }, false);
   const sciToken = rSci.data.token;
   const old = token; token = sciToken;

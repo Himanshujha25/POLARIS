@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { MapPin, Check, Plus } from 'lucide-react';
+import { MapPin, Check, Plus, FileText } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
+import { exportIncidentSARReport } from '../lib/reportGenerator';
 
 export default function IncidentDetail() {
   const { id } = useParams();
@@ -71,7 +72,16 @@ export default function IncidentDetail() {
     <div className="flex flex-col gap-4">
       <Card className={`p-4 ${i.severity === 'Critical' ? 'border-red-400 dark:border-red-600' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-xl font-extrabold">{i.incidentCode} · {i.type}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-extrabold">{i.incidentCode} · {i.type}</h1>
+            <button
+              onClick={() => exportIncidentSARReport(i, rollCall, resources)}
+              className="flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs font-bold text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
+              title="Export official MoES Search & Rescue debrief document"
+            >
+              <FileText size={13} /> Official SAR Report (PDF)
+            </button>
+          </div>
           <div className="flex gap-1"><Pill value={i.severity} /><Pill value={i.status} /></div>
         </div>
         <p className="text-sm flex items-center gap-1.5">

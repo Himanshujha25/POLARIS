@@ -28,6 +28,11 @@ router.get('/', async (req, res) => {
   if (req.query.status) filter.status = req.query.status;
   if (req.query.node) filter.currentNode = req.query.node;
   if (req.query.expeditionId) filter.expeditionId = req.query.expeditionId;
+  if (req.query.containerNumber) filter.containerNumber = req.query.containerNumber;
+  if (req.query.search) {
+    const q = new RegExp(req.query.search, 'i');
+    filter.$or = [{ trackingNumber: q }, { title: q }, { containerNumber: q }, { sealNumber: q }];
+  }
   res.json(await Cargo.find(filter).sort({ createdAt: -1 }).limit(200));
 });
 
