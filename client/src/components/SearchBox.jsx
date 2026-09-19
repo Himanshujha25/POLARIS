@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { api } from '../lib/api';
 
 const GROUP_LABEL = { expeditions: 'Expeditions', cargos: 'Cargo', assets: 'Assets', personnel: 'Personnel', inventory: 'Inventory', incidents: 'Incidents', locations: 'Locations' };
@@ -68,7 +68,9 @@ export default function SearchBox({ onOpenPalette }) {
         <div className="absolute right-0 top-10 max-h-96 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-[#111a2e]">
           <div className="flex items-center justify-between p-1">
             <p className="text-xs font-bold">{total} result(s)</p>
-            <button onClick={() => setOpen(false)} className="text-xs text-slate-500">✕</button>
+            <button onClick={() => setOpen(false)} className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+              <X size={14} />
+            </button>
           </div>
           {Object.entries(results).map(([group, items]) => items.length > 0 && (
             <div key={group} className="mt-1">

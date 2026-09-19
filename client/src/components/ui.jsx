@@ -43,7 +43,7 @@ export function Pill({ value }) {
 }
 
 export function TableWrap({ children }) {
-  return <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">{children}</div>;
+  return <div className="w-full max-w-full overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">{children}</div>;
 }
 
 export function Th({ children }) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MapPin, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
@@ -114,10 +115,18 @@ export default function Locations() {
               <Pill value={l.type} />
             </div>
             <p className="text-xs text-slate-500">Parent: {l.parentId ? parentName(l.parentId) : '—'} {l.region && `· ${l.region}`}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Next resupply: {l.nextResupplyDate ? new Date(l.nextResupplyDate).toLocaleDateString() : 'not set'}
-              {l.coordinates?.lat !== undefined && ` · 📍 ${l.coordinates.lat}, ${l.coordinates.lng}`}
-              {Array.isArray(l.dangerPolygon) && l.dangerPolygon.length >= 3 && ' · ⚠️ danger zone'}
+            <p className="mt-1 text-xs text-slate-500 flex flex-wrap items-center gap-2">
+              <span>Next resupply: {l.nextResupplyDate ? new Date(l.nextResupplyDate).toLocaleDateString() : 'not set'}</span>
+              {l.coordinates?.lat !== undefined && (
+                <span className="flex items-center gap-0.5">
+                  <MapPin size={11} className="text-cyan-500" /> {l.coordinates.lat}, {l.coordinates.lng}
+                </span>
+              )}
+              {Array.isArray(l.dangerPolygon) && l.dangerPolygon.length >= 3 && (
+                <span className="flex items-center gap-0.5 text-amber-500 font-semibold">
+                  <AlertTriangle size={11} /> Danger Zone
+                </span>
+              )}
             </p>
             {canEdit && (
               <div className="mt-2 flex flex-wrap gap-2">

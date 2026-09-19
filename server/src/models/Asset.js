@@ -19,6 +19,8 @@ const assetSchema = new mongoose.Schema({
   assignedToPersonnelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Personnel' },
   expeditionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Expedition', index: true },
   lastServicedDate: Date,
+  imageUrl: { type: String },
+  ocrExtractedText: { type: String },
   telemetry: { engineTempC: Number, vibrationLevel: Number, fuelLevelPercent: Number, oilPressurePsi: Number }
 }, { timestamps: true });
 

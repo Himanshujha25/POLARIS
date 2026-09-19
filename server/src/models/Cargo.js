@@ -12,6 +12,16 @@ const cargoSchema = new mongoose.Schema({
   weightKg: Number,
   volumeM3: Number,
   isHazmat: { type: Boolean, default: false },
+  containerNumber: { type: String, trim: true },
+  sealNumber: { type: String, trim: true },
+  tareWeightKg: { type: Number, default: 2200 },
+  containerType: {
+    type: String,
+    enum: ['20ft_Standard', '20ft_Reefer_Heated', '40ft_Standard', 'Pallet_Crate', 'Fuel_ISO_Tank'],
+    default: '20ft_Standard'
+  },
+  imageUrl: { type: String },
+  ocrExtractedText: { type: String },
   currentLocation: { type: String, default: 'NCPOR Goa' },
   currentNode: {
     type: String,

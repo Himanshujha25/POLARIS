@@ -5,12 +5,13 @@ import L from 'leaflet';
 import {
   MapPin, Radio, Compass, Navigation, LocateFixed, Siren,
   Satellite, AlertTriangle, ShieldAlert, Crosshair, Users,
-  RefreshCw, CheckCircle2, ChevronRight, Eye, Footprints, Layers
+  RefreshCw, CheckCircle2, ChevronRight, Eye, Footprints, Layers,
+  Upload, FileUp, Route, X, Zap
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, btnGhost, btnPrimary, btnDanger } from '../components/ui';
+import { Card, Pill, Spinner, Empty, btnGhost, btnPrimary, btnDanger, Modal, Field, inputCls } from '../components/ui';
 import { calculateDistanceKm, calculateBearing, distanceToPolygonMeters } from '../lib/geoUtils';
 import { playRadarPing, playRadioChirp, startSiren, stopSiren } from '../lib/audio';
 
@@ -102,6 +103,116 @@ export default function MapView() {
   const [crevasseWarning, setCrevasseWarning] = useState(null);
   const [mapLayer, setMapLayer] = useState('dark');
   const watchRef = useRef(null);
+
+  // Garmin GPX Track Ingestion & Trail visualization
+  const [showGpxModal, setShowGpxModal] = useState(false);
+  const [gpxTargetBadge, setGpxTargetBadge] = useState('');
+  const [gpxRawXml, setGpxRawXml] = useState('');
+  const [gpxFileName, setGpxFileName] = useState('');
+  const [gpxBusy, setGpxBusy] = useState(false);
+  const [gpxStatus, setGpxStatus] = useState('');
+  const [gpxTrack, setGpxTrack] = useState({ badgeId: '', points: [], name: '' });
+
+  // Pre-load realistic sample Larsemann Hills Traverse GPX
+  const loadSampleTraverseGpx = () => {
+    const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Garmin GPSMAP 66sr" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Bharati to Stornes Peninsula Glacier Traverse</name>
+    <time>2026-09-19T08:00:00Z</time>
+  </metadata>
+  <trk>
+    <name>Traverse Route Alpha</name>
+    <trkseg>
+      <trkpt lat="-69.4042" lon="76.1873"><ele>32.0</ele><time>2026-09-19T08:00:00Z</time></trkpt>
+      <trkpt lat="-69.4058" lon="76.1912"><ele>38.5</ele><time>2026-09-19T08:15:00Z</time></trkpt>
+      <trkpt lat="-69.4081" lon="76.1965"><ele>45.1</ele><time>2026-09-19T08:30:00Z</time></trkpt>
+      <trkpt lat="-69.4110" lon="76.2024"><ele>52.0</ele><time>2026-09-19T08:45:00Z</time></trkpt>
+      <trkpt lat="-69.4145" lon="76.2089"><ele>61.2</ele><time>2026-09-19T09:00:00Z</time></trkpt>
+      <trkpt lat="-69.4182" lon="76.2160"><ele>74.8</ele><time>2026-09-19T09:15:00Z</time></trkpt>
+      <trkpt lat="-69.4215" lon="76.2241"><ele>86.4</ele><time>2026-09-19T09:30:00Z</time></trkpt>
+      <trkpt lat="-69.4250" lon="76.2330"><ele>98.1</ele><time>2026-09-19T09:45:00Z</time></trkpt>
+      <trkpt lat="-69.4290" lon="76.2425"><ele>112.0</ele><time>2026-09-19T10:00:00Z</time></trkpt>
+      <trkpt lat="-69.4325" lon="76.2510"><ele>125.5</ele><time>2026-09-19T10:15:00Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>`;
+    setGpxRawXml(sampleXml);
+    setGpxFileName('Larsemann_Hills_Traverse_GPSMAP66.gpx');
+    setGpxStatus('Loaded sample 10-waypoint glacier traverse (Larsemann Hills)');
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setGpxFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result;
+      if (typeof text === 'string') {
+        setGpxRawXml(text);
+        const count = (text.match(/<trkpt/gi) || []).length || (text.match(/<wpt/gi) || []).length;
+        setGpxStatus(`Parsed ${count} trackpoints from ${file.name}`);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleIngestGpx = async (e) => {
+    e.preventDefault();
+    if (!gpxRawXml.trim()) {
+      alert('Please upload or generate a GPX file first.');
+      return;
+    }
+    const target = gpxTargetBadge || personnel[0]?.badgeId;
+    if (!target) {
+      alert('No personnel badge selected.');
+      return;
+    }
+
+    setGpxBusy(true);
+    try {
+      const res = await api('/api/v1/personnel/ingest-gpx', {
+        method: 'POST',
+        body: JSON.stringify({ badgeId: target, gpxData: gpxRawXml })
+      });
+      if (res.tracks && res.tracks.length > 0) {
+        const pts = res.tracks.map(t => [t.lat, t.lng]);
+        setGpxTrack({
+          badgeId: target,
+          points: pts,
+          name: `Garmin GPX Trek (${pts.length} pts)`
+        });
+        const last = pts[pts.length - 1];
+        setFlyTarget({ lat: last[0], lng: last[1], zoom: 14 });
+        setShowGpxModal(false);
+        load();
+      }
+    } catch (err) {
+      alert('Failed to ingest GPX: ' + (err.message || 'Server error'));
+    }
+    setGpxBusy(false);
+  };
+
+  const handleLoadPersonnelTrail = async (p) => {
+    try {
+      const tracks = await api(`/api/v1/personnel/${p._id}/tracks?limit=300`);
+      if (tracks && tracks.length > 0) {
+        const pts = tracks.map(t => [t.lat, t.lng]);
+        setGpxTrack({
+          badgeId: p.badgeId,
+          points: pts,
+          name: `GPS Breadcrumb Trail (${tracks.length} points)`
+        });
+        const last = pts[pts.length - 1];
+        setFlyTarget({ lat: last[0], lng: last[1], zoom: 14 });
+      } else {
+        alert(`No historical GPS breadcrumbs recorded yet for ${p.badgeId}. Import a Garmin GPX file or stream live telemetry.`);
+      }
+    } catch (err) {
+      alert('Failed to load trail: ' + (err.message || 'Error'));
+    }
+  };
 
   // Acquire user's live high-accuracy GPS position & human-readable address
   const handleLocateMe = () => {
@@ -225,7 +336,7 @@ export default function MapView() {
           notes: `Synchronized from live operator device (GNSS Accuracy: ±${myAccuracy}m)`
         }
       });
-      setSyncNotice(`✅ Transmitted! ${badge} position updated on radar to your exact device location.`);
+      setSyncNotice(`Transmitted: ${badge} position updated on radar to your exact device location.`);
       load();
     } catch (err) {
       alert(`Sync error: ${err.message}`);
@@ -273,7 +384,7 @@ export default function MapView() {
             title="Use device satellite GNSS to plot your position"
           >
             <LocateFixed size={14} className={locatingUser ? 'animate-spin text-cyan-500' : 'text-cyan-500'} />
-            {locatingUser ? 'Acquiring GPS...' : '🛰️ My Live GPS'}
+            {locatingUser ? 'Acquiring GPS...' : 'My Live GPS'}
           </button>
 
           {/* Map Layer Switcher */}
@@ -284,6 +395,18 @@ export default function MapView() {
           >
             <Layers size={13} />
             <span>{mapLayer === 'dark' ? 'Grid' : 'Satellite'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (personnel[0] && !gpxTargetBadge) setGpxTargetBadge(personnel[0].badgeId);
+              setShowGpxModal(true);
+            }}
+            className={`${btnPrimary} !px-3 !py-1.5 text-xs flex items-center gap-1.5 shadow-sm`}
+            title="Ingest Garmin GPX track file from field units"
+          >
+            <Upload size={13} />
+            <span>Ingest GPX Track</span>
           </button>
 
           <button onClick={load} className={`${btnGhost} !px-3 !py-1.5 text-xs flex items-center gap-1.5`}>
@@ -300,7 +423,7 @@ export default function MapView() {
             <Siren size={24} className="text-red-500 animate-bounce" />
             <div>
               <p className="font-extrabold text-sm uppercase tracking-wider text-red-300">
-                🚨 CRITICAL EMERGENCY DISTRESS BEACON ACTIVE
+                CRITICAL EMERGENCY DISTRESS BEACON ACTIVE
               </p>
               <p className="text-xs text-red-200/90 mt-0.5">
                 {activeDistress.personnel.length > 0
@@ -332,7 +455,7 @@ export default function MapView() {
           <div className="flex items-center gap-2">
             <AlertTriangle size={18} className="text-amber-400 animate-bounce" />
             <span>
-              ⚠️ RADAR PROXIMITY ALERT: {crevasseWarning.distance} meters to {crevasseWarning.name}! Halting recommended.
+              RADAR PROXIMITY ALERT: {crevasseWarning.distance} meters to {crevasseWarning.name}! Halting recommended.
             </span>
           </div>
           <span className="text-[10px] font-mono uppercase bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/40">
@@ -386,7 +509,7 @@ export default function MapView() {
                 className={`${btnPrimary} !px-3.5 !py-1 text-xs font-bold shadow-sm flex items-center gap-1.5`}
               >
                 <Satellite size={13} />
-                {syncingRoster ? 'Broadcasting...' : `📡 Set ${targetBadge} to Device GPS`}
+                {syncingRoster ? 'Broadcasting...' : `Set ${targetBadge} to Device GPS`}
               </button>
             </div>
           </div>
@@ -413,9 +536,10 @@ export default function MapView() {
                 setStation(s.name);
                 setFlyTarget({ lat: s.lat, lng: s.lng, zoom: 13 });
               }}
-              className={`${btnGhost} !px-3 !py-1 text-xs font-medium ${station === s.name ? '!border-cyan-500 !text-cyan-500 dark:!text-cyan-400 bg-cyan-500/10' : ''}`}
+              className={`${btnGhost} !px-3 !py-1 text-xs font-medium flex items-center gap-1.5 ${station === s.name ? '!border-cyan-500 !text-cyan-500 dark:!text-cyan-400 bg-cyan-500/10' : ''}`}
             >
-              📍 {s.name}
+              <MapPin size={12} className="text-cyan-500" />
+              <span>{s.name}</span>
             </button>
           ))}
         </div>
@@ -456,8 +580,46 @@ export default function MapView() {
                   {gpsTrail.length > 1 && (
                     <Polyline
                       positions={gpsTrail}
-                      pathOptions={{ color: '#06b6d4', weight: 4, dashArray: '6, 8', opacity: 0.9 }}
+                      pathOptions={{ color: '#38bdf8', weight: 4, dashArray: '6, 8', opacity: 0.9 }}
                     />
+                  )}
+
+                  {/* Garmin Ingested GPX Trek / Route Polyline */}
+                  {gpxTrack.points.length > 0 && (
+                    <>
+                      <Polyline
+                        positions={gpxTrack.points}
+                        pathOptions={{ color: '#06b6d4', weight: 5, opacity: 0.95 }}
+                      />
+                      <CircleMarker
+                        center={gpxTrack.points[0]}
+                        radius={6}
+                        pathOptions={{ color: '#10b981', fillColor: '#34d399', fillOpacity: 1, weight: 2 }}
+                      >
+                        <Popup>
+                          <div className="p-1 text-xs">
+                            <p className="font-bold text-emerald-500">Traverse Origin (Trek Start)</p>
+                            <p className="font-mono text-[10px] text-slate-500">
+                              {gpxTrack.points[0][0].toFixed(4)}°, {gpxTrack.points[0][1].toFixed(4)}°
+                            </p>
+                          </div>
+                        </Popup>
+                      </CircleMarker>
+                      <CircleMarker
+                        center={gpxTrack.points[gpxTrack.points.length - 1]}
+                        radius={7}
+                        pathOptions={{ color: '#06b6d4', fillColor: '#22d3ee', fillOpacity: 1, weight: 2 }}
+                      >
+                        <Popup>
+                          <div className="p-1 text-xs">
+                            <p className="font-bold text-cyan-500">Trek Terminus / Last Ping</p>
+                            <p className="font-mono text-[10px] text-slate-500">
+                              {gpxTrack.badgeId}: {gpxTrack.points[gpxTrack.points.length - 1][0].toFixed(4)}°, {gpxTrack.points[gpxTrack.points.length - 1][1].toFixed(4)}°
+                            </p>
+                          </div>
+                        </Popup>
+                      </CircleMarker>
+                    </>
                   )}
 
                   {/* Stations Markers */}
@@ -465,7 +627,10 @@ export default function MapView() {
                     <Marker key={s.id} position={[s.lat, s.lng]}>
                       <Popup>
                         <div className="p-1 text-xs">
-                          <p className="font-extrabold text-sm text-cyan-600 dark:text-cyan-400">📍 {s.name}</p>
+                          <p className="font-extrabold text-sm text-cyan-600 dark:text-cyan-400 flex items-center gap-1">
+                            <MapPin size={13} />
+                            <span>{s.name}</span>
+                          </p>
                           <p className="text-slate-600">{s.type}</p>
                           <p className="font-mono text-[11px] text-slate-500 mt-1">
                             {s.lat.toFixed(4)}°, {s.lng.toFixed(4)}°
@@ -570,6 +735,22 @@ export default function MapView() {
                     </>
                   )}
                 </MapContainer>
+
+                {/* Floating GPX Route Overlay Indicator */}
+                {gpxTrack.points.length > 0 && (
+                  <div className="absolute top-3 right-3 z-[1000] bg-slate-900/90 backdrop-blur border border-cyan-500/50 rounded-lg p-2 text-xs text-white flex items-center gap-2 shadow-lg">
+                    <Footprints size={14} className="text-cyan-400" />
+                    <span className="font-mono text-cyan-300 font-bold">{gpxTrack.badgeId}:</span>
+                    <span className="text-slate-300">{gpxTrack.name || `${gpxTrack.points.length} GPS points`}</span>
+                    <button
+                      type="button"
+                      onClick={() => setGpxTrack({ badgeId: '', points: [], name: '' })}
+                      className="ml-2 text-rose-400 hover:text-rose-300 font-bold text-xs inline-flex items-center gap-0.5"
+                    >
+                      <X size={11} /> Clear
+                    </button>
+                  </div>
+                )}
               </div>
             </Card>
           )}
@@ -636,19 +817,29 @@ export default function MapView() {
                             </button>
                           )}
                           {hasCoords && (
-                            <button
-                              onClick={() => {
-                                setFlyTarget({
-                                  lat: p.currentCoordinates.lat,
-                                  lng: p.currentCoordinates.lng,
-                                  zoom: 15
-                                });
-                              }}
-                              className="px-2 py-0.5 text-[10px] font-bold rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 transition-all flex items-center gap-1"
-                            >
-                              <Crosshair size={11} />
-                              Locate
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleLoadPersonnelTrail(p)}
+                                className="px-2 py-0.5 text-[10px] font-bold rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 transition-all flex items-center gap-1"
+                                title={`Inspect GPS breadcrumb track for ${p.badgeId}`}
+                              >
+                                <Footprints size={11} />
+                                Trail
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setFlyTarget({
+                                    lat: p.currentCoordinates.lat,
+                                    lng: p.currentCoordinates.lng,
+                                    zoom: 15
+                                  });
+                                }}
+                                className="px-2 py-0.5 text-[10px] font-bold rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 transition-all flex items-center gap-1"
+                              >
+                                <Crosshair size={11} />
+                                Locate
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -674,6 +865,82 @@ export default function MapView() {
           </Card>
         </div>
       </div>
+
+      {/* Garmin GPX File Ingest Modal */}
+      {showGpxModal && (
+        <Modal title="Ingest Garmin GPX Track (Field Units)" onClose={() => setShowGpxModal(false)}>
+          <form onSubmit={handleIngestGpx} className="flex flex-col gap-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Upload an official GPX XML file from Garmin GPSMAP 66sr, inReach, or eTrex field units to ingest waypoints and plot traverse tracks on the tactical map.
+            </p>
+
+            <Field label="Target Field Personnel / Badge">
+              <select
+                className={inputCls}
+                value={gpxTargetBadge}
+                onChange={e => setGpxTargetBadge(e.target.value)}
+                required
+              >
+                {personnel.map(p => (
+                  <option key={p._id} value={p.badgeId}>
+                    {p.badgeId} — {p.currentLocation || 'Field Unit'} ({p.currentStatus})
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Select GPX File (.gpx)
+              </label>
+              <input
+                type="file"
+                accept=".gpx,text/xml,application/gpx+xml"
+                onChange={handleFileUpload}
+                className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 dark:file:bg-cyan-950 dark:file:text-cyan-300"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-400">Or use pre-calibrated field data:</span>
+              <button
+                type="button"
+                onClick={loadSampleTraverseGpx}
+                className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1.5"
+              >
+                <Zap size={13} className="text-amber-500" />
+                <span>Load Sample Larsemann Hills Traverse GPX</span>
+              </button>
+            </div>
+
+            {gpxStatus && (
+              <div className="p-2 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 text-xs font-medium">
+                {gpxStatus}
+              </div>
+            )}
+
+            {gpxRawXml && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[11px] font-mono text-slate-400">Raw GPX Preview ({gpxRawXml.length} bytes):</span>
+                <textarea
+                  readOnly
+                  rows={4}
+                  value={gpxRawXml}
+                  className={inputCls + ' font-mono text-[10px] text-slate-500 resize-none'}
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={gpxBusy || !gpxRawXml}
+              className={`${btnPrimary} w-full mt-2`}
+            >
+              {gpxBusy ? 'Ingesting GPX Waypoints...' : 'Ingest & Plot On Tactical Map'}
+            </button>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

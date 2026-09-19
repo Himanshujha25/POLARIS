@@ -196,6 +196,10 @@ function check(name, cond, extra = '') {
   check('rbac/register-blocked-for-nonadmin', r.status === 403, `status=${r.status}`);
   token = old;
 
+  if (newExpId) {
+    await req('DELETE', `/api/v1/expeditions/${newExpId}`);
+  }
+
   const failed = results.filter(x => !x.pass);
   console.log(`\n==== ${results.length - failed.length}/${results.length} passed ====`);
   process.exit(failed.length ? 1 : 0);

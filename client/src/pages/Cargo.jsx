@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Search, Biohazard } from 'lucide-react';
+import { Search, Biohazard, Printer, Box, ShieldCheck, Package, ScanLine } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
+import ContainerLabelModal from '../components/ContainerLabelModal';
+import ImageOcrUploader from '../components/ImageOcrUploader';
 
 const NODES = ['NCPOR_Goa', 'Mumbai_Port', 'Cape_Town_Hub', 'Research_Vessel', 'Ice_Shelf_Barrier', 'Bharati_Station', 'Maitri_Station'];
 
@@ -23,14 +25,30 @@ export default function Cargo() {
     weightKg: 100,
     expeditionId: '',
     isHazmat: false,
-    itemsText: ''
+    containerNumber: '',
+    sealNumber: '',
+    containerType: '20ft_Standard',
+    tareWeightKg: 2200,
+    itemsText: '',
+    imageUrl: '',
+    ocrExtractedText: ''
   });
+  const [printCargo, setPrintCargo] = useState(null);
   const [timeline, setTimeline] = useState(null);
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [receiveCargo, setReceiveCargo] = useState(null);
   const [receiveStation, setReceiveStation] = useState('Maitri');
   const [editing, setEditing] = useState(null);
-  const [editForm, setEditForm] = useState({ title: '', weightKg: '', eta: '' });
+  const [editForm, setEditForm] = useState({
+    title: '',
+    weightKg: '',
+    eta: '',
+    containerNumber: '',
+    sealNumber: '',
+    containerType: '20ft_Standard',
+    imageUrl: '',
+    ocrExtractedText: ''
+  });
   const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -51,6 +69,32 @@ export default function Cargo() {
   };
   useEffect(() => { load(); }, [statusF]);
   useLiveRefresh(load);
+
+  const generateNewTrackingNumber = (prefix = 'CRG') => {
+    const year = new Date().getFullYear();
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${year}-BHR-${rand}`;
+  };
+
+  const openCreateModal = () => {
+    setForm({
+      trackingNumber: '',
+      title: '',
+      category: 'Provisions',
+      weightKg: '',
+      expeditionId: exps[0]?._id || '',
+      isHazmat: false,
+      containerNumber: '',
+      sealNumber: '',
+      containerType: '20ft_Standard',
+      tareWeightKg: 2200,
+      itemsText: '',
+      imageUrl: '',
+      ocrExtractedText: ''
+    });
+    setError('');
+    setShowCreate(true);
+  };
 
   const create = async (e) => {
     e.preventDefault();
@@ -86,7 +130,16 @@ export default function Cargo() {
 
   const openEdit = (c) => {
     setEditing(c._id);
-    setEditForm({ title: c.title, weightKg: c.weightKg || '', eta: c.eta ? c.eta.slice(0, 10) : '' });
+    setEditForm({
+      title: c.title,
+      weightKg: c.weightKg || '',
+      eta: c.eta ? c.eta.slice(0, 10) : '',
+      containerNumber: c.containerNumber || '',
+      sealNumber: c.sealNumber || '',
+      containerType: c.containerType || '20ft_Standard',
+      imageUrl: c.imageUrl || '',
+      ocrExtractedText: c.ocrExtractedText || ''
+    });
     setError('');
   };
 
@@ -96,7 +149,16 @@ export default function Cargo() {
     try {
       await api(`/api/v1/cargo/${editing}`, {
         method: 'PATCH',
-        body: { title: editForm.title, weightKg: Number(editForm.weightKg) || 0, eta: editForm.eta || undefined }
+        body: {
+          title: editForm.title,
+          weightKg: Number(editForm.weightKg) || 0,
+          eta: editForm.eta || undefined,
+          containerNumber: editForm.containerNumber,
+          sealNumber: editForm.sealNumber,
+          containerType: editForm.containerType,
+          imageUrl: editForm.imageUrl,
+          ocrExtractedText: editForm.ocrExtractedText
+        }
       });
       setEditing(null); load();
     } catch (err) { setError(err.message); }
@@ -149,7 +211,7 @@ export default function Cargo() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-extrabold sm:text-2xl">Cargo Tracking</h1>
-        {canEdit && <button className={btnPrimary} onClick={() => setShowCreate(true)}>+ Register Cargo</button>}
+        {canEdit && <button className={btnPrimary} onClick={openCreateModal}>+ Register Cargo</button>}
       </div>
 
       <Card className="p-3">
@@ -198,7 +260,10 @@ export default function Cargo() {
             </div>
             {c.items && c.items.length > 0 && (
               <div className="mt-1.5 rounded bg-slate-50 p-2 text-xs dark:bg-slate-800/40">
-                <p className="font-semibold text-slate-500 dark:text-slate-400">📦 Manifest / Container Items ({c.items.length}):</p>
+                <p className="font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Package size={13} className="text-cyan-500 shrink-0" />
+                  <span>Manifest / Container Items ({c.items.length}):</span>
+                </p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {c.items.map((it, idx) => (
                     <span key={idx} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-medium dark:border-slate-700 dark:bg-slate-800">
@@ -208,10 +273,52 @@ export default function Cargo() {
                 </div>
               </div>
             )}
+            {(c.containerNumber || c.sealNumber) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded border border-slate-200/60 dark:border-slate-700/50">
+                {c.containerNumber && (
+                  <span className="font-mono flex items-center gap-1 font-bold text-slate-900 dark:text-slate-100">
+                    <Box size={12} className="text-cyan-500 shrink-0" />
+                    <span>ISO: {c.containerNumber}</span>
+                  </span>
+                )}
+                {c.sealNumber && (
+                  <span className="font-mono flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
+                    <ShieldCheck size={12} className="shrink-0" />
+                    <span>Seal: {c.sealNumber}</span>
+                  </span>
+                )}
+              </div>
+            )}
+            {c.imageUrl && (
+              <div className="mt-2 relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-900/40">
+                <img src={c.imageUrl} alt={c.title} className="w-full h-28 object-cover" />
+                {c.ocrExtractedText && (
+                  <div className="absolute bottom-0 inset-x-0 bg-slate-950/85 backdrop-blur px-2 py-1 text-[10px] font-mono text-cyan-300 truncate flex items-center gap-1" title={c.ocrExtractedText}>
+                    <ScanLine size={11} className="shrink-0 text-cyan-400" />
+                    <span>Label OCR: {c.ocrExtractedText.replace(/\n+/g, ' ')}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {!c.imageUrl && c.ocrExtractedText && (
+              <div className="mt-1.5 p-1.5 rounded bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-[11px] font-mono text-slate-600 dark:text-slate-400 truncate flex items-center gap-1" title={c.ocrExtractedText}>
+                <ScanLine size={11} className="shrink-0 text-cyan-500" />
+                <span>Label OCR: {c.ocrExtractedText.replace(/\n+/g, ' ')}</span>
+              </div>
+            )}
             <p className="mt-1 text-xs text-slate-500">NCPOR Goa → Port → Ship → Ice Shelf → Station</p>
             <p className="text-xs font-medium text-cyan-600 dark:text-cyan-400">Now: {c.currentNode} · ETA {c.eta ? new Date(c.eta).toLocaleDateString() : '—'}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button onClick={() => openTimeline(c)} className={btnGhost + ' !px-3 !py-1 text-xs'}>Timeline</button>
+              <button
+                type="button"
+                onClick={() => setPrintCargo(c)}
+                className={`${btnGhost} !px-3 !py-1 text-xs flex items-center gap-1 font-semibold text-cyan-600 dark:text-cyan-400 hover:border-cyan-500`}
+                title="Print Official Customs Shipping Container Label & Barcode"
+              >
+                <Printer size={13} />
+                <span>Print Label</span>
+              </button>
               {canEdit && c.status !== 'DeliveredStation' && (
                 <button onClick={() => advance(c)} className={btnGhost + ' !px-3 !py-1 text-xs'}>Advance → next node</button>
               )}
@@ -232,8 +339,93 @@ export default function Cargo() {
       {showCreate && (
         <Modal title="Register Cargo & Manifest" onClose={() => setShowCreate(false)}>
           <form onSubmit={create} className="flex flex-col gap-3">
-            <Field label="Tracking Number / QR"><input className={inputCls} required placeholder="e.g. CRG-2027-BHR-002" value={form.trackingNumber} onChange={e => setForm({ ...form, trackingNumber: e.target.value })} /></Field>
+            <Field label="Tracking Number / QR">
+              <input
+                className={inputCls}
+                required
+                placeholder="e.g. CRG-2027-BHR-002"
+                value={form.trackingNumber}
+                onChange={e => setForm({ ...form, trackingNumber: e.target.value })}
+              />
+            </Field>
             <Field label="Consignment Title"><input className={inputCls} required placeholder="e.g. Winter Provisions Container #4" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></Field>
+
+            <ImageOcrUploader
+              label="Container & Customs Seal Photo (OCR)"
+              imageUrl={form.imageUrl}
+              onImageChange={url => setForm(f => ({ ...f, imageUrl: url }))}
+              ocrText={form.ocrExtractedText}
+              onOcrTextChange={txt => setForm(f => ({ ...f, ocrExtractedText: txt }))}
+              onReset={() => setForm(f => ({
+                ...f,
+                containerNumber: '',
+                sealNumber: '',
+                imageUrl: '',
+                ocrExtractedText: ''
+              }))}
+              mode="container"
+              onAutoFill={suggested => {
+                setForm(f => {
+                  let matchedExpId = f.expeditionId;
+                  if (suggested.expeditionKeyword && exps.length > 0) {
+                    const match = exps.find(x =>
+                      x.expeditionCode.toUpperCase().includes(suggested.expeditionKeyword) ||
+                      (suggested.expeditionKeyword.includes('BHARATI') && x.targetBase?.includes('Bharati')) ||
+                      (suggested.expeditionKeyword.includes('MAITRI') && x.targetBase?.includes('Maitri'))
+                    );
+                    if (match) matchedExpId = match._id;
+                  }
+
+                  return {
+                    ...f,
+                    title: suggested.title !== undefined ? suggested.title : f.title,
+                    category: suggested.category !== undefined ? suggested.category : f.category,
+                    containerType: suggested.containerType !== undefined ? suggested.containerType : f.containerType,
+                    weightKg: suggested.weightKg !== undefined ? suggested.weightKg : f.weightKg,
+                    trackingNumber: suggested.trackingNumber || f.trackingNumber,
+                    containerNumber: suggested.containerNumber !== undefined ? suggested.containerNumber : f.containerNumber,
+                    sealNumber: suggested.sealNumber !== undefined ? suggested.sealNumber : f.sealNumber,
+                    tareWeightKg: suggested.tareWeightKg !== undefined ? suggested.tareWeightKg : f.tareWeightKg,
+                    isHazmat: suggested.isHazmat !== undefined ? suggested.isHazmat : f.isHazmat,
+                    itemsText: suggested.itemsText !== undefined ? suggested.itemsText : f.itemsText,
+                    expeditionId: matchedExpId
+                  };
+                });
+              }}
+            />
+            
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="ISO Container No.">
+                <input
+                  className={inputCls}
+                  placeholder="e.g. MSCU-7294012"
+                  value={form.containerNumber}
+                  onChange={e => setForm({ ...form, containerNumber: e.target.value })}
+                />
+              </Field>
+              <Field label="Customs Seal No.">
+                <input
+                  className={inputCls}
+                  placeholder="e.g. IND-CUS-88291"
+                  value={form.sealNumber}
+                  onChange={e => setForm({ ...form, sealNumber: e.target.value })}
+                />
+              </Field>
+              <Field label="Container Type">
+                <select
+                  className={inputCls}
+                  value={form.containerType}
+                  onChange={e => setForm({ ...form, containerType: e.target.value })}
+                >
+                  <option value="20ft_Standard">20ft Standard</option>
+                  <option value="20ft_Reefer_Heated">20ft Reefer (Heated)</option>
+                  <option value="40ft_Standard">40ft Standard</option>
+                  <option value="Fuel_ISO_Tank">Fuel ISO Tank</option>
+                  <option value="Pallet_Crate">Pallet / Crate</option>
+                </select>
+              </Field>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <Field label="Category">
                 <select className={inputCls} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
@@ -276,13 +468,52 @@ export default function Cargo() {
       )}
 
       {editing && (
-        <Modal title="Edit cargo" onClose={() => setEditing(null)}>
+        <Modal title="Edit cargo & container specifications" onClose={() => setEditing(null)}>
           <form onSubmit={saveEdit} className="flex flex-col gap-3">
             <Field label="Title"><input className={inputCls} required value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} /></Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Weight (kg)"><input type="number" className={inputCls} value={editForm.weightKg} onChange={e => setEditForm({ ...editForm, weightKg: e.target.value })} /></Field>
               <Field label="ETA"><input type="date" className={inputCls} value={editForm.eta} onChange={e => setEditForm({ ...editForm, eta: e.target.value })} /></Field>
             </div>
+
+            <ImageOcrUploader
+              label="Container / Tamper Seal Inspection Photo (OCR)"
+              imageUrl={editForm.imageUrl}
+              onImageChange={url => setEditForm(f => ({ ...f, imageUrl: url }))}
+              ocrText={editForm.ocrExtractedText}
+              onOcrTextChange={txt => setEditForm(f => ({ ...f, ocrExtractedText: txt }))}
+              mode="container"
+              onAutoFill={suggested => {
+                setEditForm(f => ({
+                  ...f,
+                  title: suggested.title || f.title,
+                  containerNumber: suggested.containerNumber !== undefined ? suggested.containerNumber : f.containerNumber,
+                  sealNumber: suggested.sealNumber !== undefined ? suggested.sealNumber : f.sealNumber,
+                  tareWeightKg: suggested.tareWeightKg || f.tareWeightKg,
+                  weightKg: suggested.weightKg || f.weightKg
+                }));
+              }}
+            />
+
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="ISO Container No.">
+                <input
+                  className={inputCls}
+                  placeholder="e.g. MSCU-7294012"
+                  value={editForm.containerNumber}
+                  onChange={e => setEditForm({ ...editForm, containerNumber: e.target.value })}
+                />
+              </Field>
+              <Field label="Customs Seal No.">
+                <input
+                  className={inputCls}
+                  placeholder="e.g. IND-CUS-88291"
+                  value={editForm.sealNumber}
+                  onChange={e => setEditForm({ ...editForm, sealNumber: e.target.value })}
+                />
+              </Field>
+            </div>
+
             <ErrorNote message={error} />
             <button className={btnPrimary}>Save changes</button>
           </form>
@@ -322,7 +553,10 @@ export default function Cargo() {
             </p>
             {receiveCargo.items && receiveCargo.items.length > 0 ? (
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-800/50">
-                <p className="font-bold text-slate-700 dark:text-slate-200">📦 Manifest items being unpacked:</p>
+                <p className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <Package size={14} className="text-cyan-500 shrink-0" />
+                  <span>Manifest items being unpacked:</span>
+                </p>
                 <ul className="mt-1.5 space-y-1">
                   {receiveCargo.items.map((it, idx) => (
                     <li key={idx} className="flex justify-between border-b border-slate-200/60 pb-0.5 last:border-0 dark:border-slate-700">
@@ -345,6 +579,13 @@ export default function Cargo() {
             <button className={btnPrimary}>Confirm Receipt & Unpack to Inventory</button>
           </form>
         </Modal>
+      )}
+
+      {printCargo && (
+        <ContainerLabelModal
+          cargo={printCargo}
+          onClose={() => setPrintCargo(null)}
+        />
       )}
     </div>
   );

@@ -47,7 +47,7 @@ router.patch('/:id/telemetry', validate(schemas.assetTelemetry), async (req, res
 router.patch('/:id', requireRoles('SuperAdmin', 'AssetOfficer', 'ExpeditionManager'), validate(schemas.assetUpdate), async (req, res) => {
   const asset = await Asset.findById(req.params.id);
   if (!asset) return res.status(404).json({ error: 'Not found' });
-  ['name', 'station', 'type', 'condition', 'maxHoursBeforeService', 'assignedToPersonnelId', 'expeditionId'].forEach(f => {
+  ['name', 'station', 'type', 'condition', 'maxHoursBeforeService', 'assignedToPersonnelId', 'expeditionId', 'imageUrl', 'ocrExtractedText'].forEach(f => {
     if (req.body[f] !== undefined) asset[f] = req.body[f];
   });
   await asset.save();

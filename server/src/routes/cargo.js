@@ -155,7 +155,7 @@ router.patch('/:id', requireRoles(...CAN_WRITE), validate(schemas.cargoUpdate), 
     const cargo = await Cargo.findById(req.params.id);
     if (!cargo) return res.status(404).json({ error: 'Not found' });
     await assertExpeditionOpen(cargo.expeditionId);
-    ['title', 'weightKg', 'volumeM3', 'isHazmat', 'eta', 'transportMode', 'items'].forEach(f => {
+    ['title', 'weightKg', 'volumeM3', 'isHazmat', 'eta', 'transportMode', 'items', 'containerNumber', 'sealNumber', 'tareWeightKg', 'containerType', 'imageUrl', 'ocrExtractedText'].forEach(f => {
       if (req.body[f] !== undefined) cargo[f] = req.body[f];
     });
     await cargo.save();
@@ -166,7 +166,7 @@ router.patch('/:id', requireRoles(...CAN_WRITE), validate(schemas.cargoUpdate), 
 });
 
 // DELETE /api/v1/cargo/:id — history kept in audit log
-router.delete('/:id', requireRoles('SuperAdmin', 'ExpeditionManager'), async (req, res) => {
+router.delete('/:id', requireRoles(...CAN_WRITE), async (req, res) => {
   const cargo = await Cargo.findById(req.params.id);
   if (!cargo) return res.status(404).json({ error: 'Not found' });
   await CargoEvent.deleteMany({ cargoId: cargo._id });

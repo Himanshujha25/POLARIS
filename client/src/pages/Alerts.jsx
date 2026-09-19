@@ -86,7 +86,7 @@ export default function Alerts() {
       </div>
 
       {showSos && (
-        <Modal title="🚨 Trigger Emergency SOS" onClose={() => setShowSos(false)}>
+        <Modal title="Trigger Emergency SOS" onClose={() => setShowSos(false)}>
           <form onSubmit={sendSos} className="flex flex-col gap-3">
             <Field label="Personnel">
               <select className={inputCls} value={sos.badgeId} onChange={e => setSos({ ...sos, badgeId: e.target.value })}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { MapPin, Calendar, Users } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Empty, Modal, Field, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog } from '../components/ui';
@@ -91,8 +92,10 @@ export default function Expeditions() {
               <Pill value={e.status} />
             </div>
             <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white">{e.title}</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              🎯 {e.targetStation} · ❄️ {e.season} · 👥 Quota: {e.totalPersonnelQuota || 35} crew
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1"><MapPin size={12} className="text-cyan-500" /> {e.targetStation}</span>
+              <span className="flex items-center gap-1"><Calendar size={12} className="text-slate-400" /> {e.season}</span>
+              <span className="flex items-center gap-1"><Users size={12} className="text-slate-400" /> Quota: {e.totalPersonnelQuota || 35} crew</span>
             </p>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
               <Link

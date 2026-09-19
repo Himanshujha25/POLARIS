@@ -15,6 +15,7 @@ import QuickDemoBar from './QuickDemoBar';
 import CommandPalette from './CommandPalette';
 import FloatingSOS from './FloatingSOS';
 import PolarTelemetryCapsule from './PolarTelemetryCapsule';
+import OfflineSyncBanner from './OfflineSyncBanner';
 import { setAudioMuted, getAudioMuted, playRadioChirp } from '../lib/audio';
 
 // PRD persona scopes (Master PRD Section 5)
@@ -97,7 +98,7 @@ export default function Layout({ children }) {
   const allLinks = navSections.flatMap(s => s.links).filter(l => l.roles.includes(user?.role));
 
   return (
-    <div className="flex min-h-full bg-slate-100 text-slate-900 dark:bg-[#0B111E] dark:text-slate-100">
+    <div className="flex min-h-full w-full max-w-full overflow-x-hidden bg-slate-100 text-slate-900 dark:bg-[#0B111E] dark:text-slate-100">
       <CommandPalette
         isOpen={showCmdPalette}
         onClose={setShowCmdPalette}
@@ -156,9 +157,9 @@ export default function Layout({ children }) {
         </Modal>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col w-full max-w-full overflow-x-hidden">
         {/* Top header */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-3 backdrop-blur-md dark:border-slate-800 dark:bg-[#0d1424]/95 sm:px-4">
+        <header className="sticky top-0 z-30 flex h-14 w-full max-w-full items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 backdrop-blur-md dark:border-slate-800 dark:bg-[#0d1424]/95 sm:px-4">
           <div className="flex items-center gap-3 shrink-0">
             {/* Mobile Brand */}
             <div className="flex items-center gap-2 md:hidden">
@@ -221,6 +222,9 @@ export default function Layout({ children }) {
           </div>
         </header>
 
+        {/* Real-Time Polar Satellite Connectivity & Offline Outbox Banner */}
+        <OfflineSyncBanner />
+
         {/* Live feed dropdown */}
         {showFeed && (
           <div className="sticky top-[52px] z-30 mx-3 mt-2 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-[#111a2e] sm:mx-4">
@@ -234,7 +238,7 @@ export default function Layout({ children }) {
           </div>
         )}
 
-        <main className="mx-auto w-full max-w-6xl flex-1 p-3 pb-24 sm:p-4 md:pb-8">{children}</main>
+        <main className="mx-auto w-full max-w-6xl min-w-0 flex-1 p-3 pb-24 sm:p-4 md:pb-8">{children}</main>
 
         {/* Mobile bottom nav */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 flex gap-1 overflow-x-auto border-t border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-[#0d1424] md:hidden">

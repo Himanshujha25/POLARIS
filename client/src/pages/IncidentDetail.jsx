@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { MapPin, Check, Plus } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Card, Pill, Spinner, Modal, Field, inputCls, btnPrimary, btnGhost } from '../components/ui';
@@ -73,7 +74,10 @@ export default function IncidentDetail() {
           <h1 className="text-xl font-extrabold">{i.incidentCode} · {i.type}</h1>
           <div className="flex gap-1"><Pill value={i.severity} /><Pill value={i.status} /></div>
         </div>
-        <p className="text-sm">📍 {i.location} · reported by {i.reportedBy?.fullName} · {new Date(i.createdAt).toLocaleString()}</p>
+        <p className="text-sm flex items-center gap-1.5">
+          <MapPin size={14} className="text-cyan-500 shrink-0" />
+          <span>{i.location} · reported by {i.reportedBy?.fullName} · {new Date(i.createdAt).toLocaleString()}</span>
+        </p>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{i.description}</p>
         {i.resolutionSummary && <p className="mt-2 rounded-lg bg-emerald-500/10 p-2 text-sm">Resolution: {i.resolutionSummary}</p>}
 
@@ -95,16 +99,20 @@ export default function IncidentDetail() {
               <div>
                 <p className="mb-1 text-xs font-semibold text-slate-500">Mobilize Responders</p>
                 <div className="flex flex-wrap gap-1">
-                  {users.map(u => (
-                    <button
-                      key={u._id}
-                      type="button"
-                      onClick={() => toggleResponder(u._id)}
-                      className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${responders.includes(u._id) ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 font-semibold' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'}`}
-                    >
-                      {responders.includes(u._id) ? '✓ ' : '+ '}{u.fullName || u.username} ({u.role})
-                    </button>
-                  ))}
+                  {users.map(u => {
+                    const isSelected = responders.includes(u._id);
+                    return (
+                      <button
+                        key={u._id}
+                        type="button"
+                        onClick={() => toggleResponder(u._id)}
+                        className={`rounded-full border px-2 py-0.5 text-xs transition-colors flex items-center gap-1 ${isSelected ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 font-semibold' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'}`}
+                      >
+                        {isSelected ? <Check size={11} /> : <Plus size={11} />}
+                        <span>{u.fullName || u.username} ({u.role})</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -112,16 +120,20 @@ export default function IncidentDetail() {
               <div className="mt-1">
                 <p className="mb-1 text-xs font-semibold text-slate-500">Deploy Station Assets</p>
                 <div className="flex flex-wrap gap-1">
-                  {resources.assets.map(a => (
-                    <button
-                      key={a._id}
-                      type="button"
-                      onClick={() => toggleAsset(a._id)}
-                      className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${selectedAssets.includes(a._id) ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'}`}
-                    >
-                      {selectedAssets.includes(a._id) ? '✓ ' : '+ '}{a.assetTag} · {a.name} ({a.condition})
-                    </button>
-                  ))}
+                  {resources.assets.map(a => {
+                    const isSelected = selectedAssets.includes(a._id);
+                    return (
+                      <button
+                        key={a._id}
+                        type="button"
+                        onClick={() => toggleAsset(a._id)}
+                        className={`rounded-full border px-2 py-0.5 text-xs transition-colors flex items-center gap-1 ${isSelected ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'}`}
+                      >
+                        {isSelected ? <Check size={11} /> : <Plus size={11} />}
+                        <span>{a.assetTag} · {a.name} ({a.condition})</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

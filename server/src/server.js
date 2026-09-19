@@ -13,12 +13,18 @@ const { startAutomation } = require('./services/automation');
 const { seedDefaultUsers, seedBaseLocations } = require('./utils/seed');
 
 const app = express();
+app.set('etag', false);
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+});
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' && process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN : true,
   credentials: true
 }));
-app.use(express.json({ limit: '200kb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());
 // HTTP request log: method, url, status, latency. Skips noisy health polls.
 app.use(morgan('[:date[iso]] :method :url :status :response-time ms', {

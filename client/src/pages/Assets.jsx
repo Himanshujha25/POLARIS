@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Wrench, Plus, Truck, Radio, Shield, AlertTriangle, Activity,
   BatteryCharging, Gauge, CheckCircle2, RefreshCw, Trash2, Edit3,
-  Search, Cpu, Satellite
+  Search, Cpu, Satellite, ScanLine
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,7 @@ import {
   Card, Pill, Spinner, Empty, Modal, Field, inputCls,
   btnPrimary, btnGhost, btnDanger, ErrorNote, ConfirmDialog
 } from '../components/ui';
+import ImageOcrUploader from '../components/ImageOcrUploader';
 
 const ASSET_TYPES = [
   'SnowVehicle',
@@ -52,7 +53,9 @@ export default function Assets() {
     station: '',
     condition: 'Operational',
     operatingHours: 0,
-    maxHoursBeforeService: 500
+    maxHoursBeforeService: 500,
+    imageUrl: '',
+    ocrExtractedText: ''
   });
 
   const [teleId, setTeleId] = useState(null);
@@ -60,7 +63,15 @@ export default function Assets() {
   const [maintId, setMaintId] = useState(null);
   const [desc, setDesc] = useState('');
   const [editing, setEditing] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', station: '', type: '', maxHoursBeforeService: '', condition: '' });
+  const [editForm, setEditForm] = useState({
+    name: '',
+    station: '',
+    type: '',
+    maxHoursBeforeService: '',
+    condition: '',
+    imageUrl: '',
+    ocrExtractedText: ''
+  });
   const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -160,7 +171,9 @@ export default function Assets() {
       station: a.station,
       type: a.type,
       maxHoursBeforeService: a.maxHoursBeforeService,
-      condition: a.condition
+      condition: a.condition,
+      imageUrl: a.imageUrl || '',
+      ocrExtractedText: a.ocrExtractedText || ''
     });
     setError('');
   };
@@ -177,7 +190,9 @@ export default function Assets() {
           station: editForm.station,
           type: editForm.type,
           maxHoursBeforeService: Number(editForm.maxHoursBeforeService),
-          condition: editForm.condition
+          condition: editForm.condition,
+          imageUrl: editForm.imageUrl,
+          ocrExtractedText: editForm.ocrExtractedText
         }
       });
       setEditing(null);
@@ -341,12 +356,37 @@ export default function Assets() {
                   </span>
                 </div>
 
+                {a.imageUrl && (
+                  <div className="mt-2.5 relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-black/10">
+                    <img src={a.imageUrl} alt={a.name} className="w-full h-28 object-cover" />
+                    {a.ocrExtractedText && (
+                      <div className="absolute bottom-0 inset-x-0 bg-slate-950/85 backdrop-blur px-2 py-1 text-[10px] font-mono text-cyan-300 truncate flex items-center gap-1" title={a.ocrExtractedText}>
+                        <ScanLine size={11} className="shrink-0 text-cyan-400" />
+                        <span>Plate OCR: {a.ocrExtractedText.replace(/\n+/g, ' ')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!a.imageUrl && a.ocrExtractedText && (
+                  <div className="mt-2 p-1.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-400 truncate flex items-center gap-1" title={a.ocrExtractedText}>
+                    <ScanLine size={11} className="shrink-0 text-cyan-500" />
+                    <span>Plate OCR: {a.ocrExtractedText.replace(/\n+/g, ' ')}</span>
+                  </div>
+                )}
+
                 {/* Service Schedule Bar */}
                 <div className="mt-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
                   <div className="flex justify-between text-xs font-mono mb-1">
                     <span className="text-slate-500">{a.operatingHours} / {a.maxHoursBeforeService} hrs</span>
-                    <span className={needsService ? 'text-rose-500 font-bold' : 'text-slate-400'}>
-                      {needsService ? `⚠️ ${hrsRemaining} hrs to overhaul` : `${hrsRemaining} hrs left`}
+                    <span className={needsService ? 'text-rose-500 font-bold flex items-center gap-1' : 'text-slate-400'}>
+                      {needsService ? (
+                        <>
+                          <AlertTriangle size={12} className="text-rose-500" />
+                          <span>{hrsRemaining} hrs to overhaul</span>
+                        </>
+                      ) : (
+                        `${hrsRemaining} hrs left`
+                      )}
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
@@ -462,6 +502,26 @@ export default function Assets() {
                 onChange={e => setCreateForm({ ...createForm, name: e.target.value })}
               />
             </Field>
+
+            <ImageOcrUploader
+              label="Equipment Rating Plate / Machine Photo (OCR)"
+              imageUrl={createForm.imageUrl}
+              onImageChange={url => setCreateForm(f => ({ ...f, imageUrl: url }))}
+              ocrText={createForm.ocrExtractedText}
+              onOcrTextChange={txt => setCreateForm(f => ({ ...f, ocrExtractedText: txt }))}
+              mode="asset"
+              onAutoFill={suggested => {
+                setCreateForm(f => ({
+                  ...f,
+                  assetTag: suggested.assetTag || f.assetTag,
+                  name: suggested.nameCandidate || f.name,
+                  type: suggested.type || f.type,
+                  station: suggested.station || f.station,
+                  operatingHours: suggested.operatingHours !== undefined ? suggested.operatingHours : f.operatingHours,
+                  maxHoursBeforeService: suggested.maxHoursBeforeService !== undefined ? suggested.maxHoursBeforeService : f.maxHoursBeforeService
+                }));
+              }}
+            />
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Assigned Station">
@@ -603,6 +663,21 @@ export default function Assets() {
                 onChange={e => setEditForm({ ...editForm, name: e.target.value })}
               />
             </Field>
+
+            <ImageOcrUploader
+              label="Equipment Rating Plate / Machine Photo (OCR)"
+              imageUrl={editForm.imageUrl}
+              onImageChange={url => setEditForm(f => ({ ...f, imageUrl: url }))}
+              ocrText={editForm.ocrExtractedText}
+              onOcrTextChange={txt => setEditForm(f => ({ ...f, ocrExtractedText: txt }))}
+              mode="asset"
+              onAutoFill={suggested => {
+                setEditForm(f => ({
+                  ...f,
+                  name: suggested.nameCandidate || f.name
+                }));
+              }}
+            />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Station">
                 <select

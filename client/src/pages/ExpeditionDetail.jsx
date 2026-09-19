@@ -381,9 +381,9 @@ export default function ExpeditionDetail() {
               </div>
               <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{exp.title}</h1>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>🎯 Target Station: <b>{exp.targetStation}</b></span>
-                <span>❄️ Season: <b>{exp.season}</b></span>
-                <span>👤 Commander: <b>{exp.leaderId?.fullName || 'Unassigned'}</b></span>
+                <span className="flex items-center gap-1"><MapPin size={12} className="text-cyan-500" /> Target Station: <b>{exp.targetStation}</b></span>
+                <span className="flex items-center gap-1"><Clock size={12} className="text-slate-400" /> Season: <b>{exp.season}</b></span>
+                <span className="flex items-center gap-1"><Users size={12} className="text-slate-400" /> Commander: <b>{exp.leaderId?.fullName || 'Unassigned'}</b></span>
               </p>
             </div>
 
@@ -487,28 +487,28 @@ export default function ExpeditionDetail() {
                 <div className="mt-4 space-y-3 text-xs">
                   <div>
                     <div className="flex justify-between font-semibold">
-                      <span>👥 Personnel Deployment</span>
+                      <span>Personnel Deployment</span>
                       <span>{readiness.personnel}% ({personnel.length}/{exp.totalPersonnelQuota})</span>
                     </div>
                     {bar(readiness.personnel)}
                   </div>
                   <div>
                     <div className="flex justify-between font-semibold">
-                      <span>📦 Cargo Manifest Delivered</span>
+                      <span>Cargo Manifest Delivered</span>
                       <span>{readiness.cargo}%</span>
                     </div>
                     {bar(readiness.cargo)}
                   </div>
                   <div>
                     <div className="flex justify-between font-semibold">
-                      <span>🚜 Asset & Vehicle Allocation</span>
+                      <span>Asset & Vehicle Allocation</span>
                       <span>{readiness.assets}% ({assets.length} assigned)</span>
                     </div>
                     {bar(readiness.assets)}
                   </div>
                   <div>
                     <div className="flex justify-between font-semibold">
-                      <span>📋 Supply Quotas Fulfilled</span>
+                      <span>Supply Quotas Fulfilled</span>
                       <span>{readiness.inventory}%</span>
                     </div>
                     {bar(readiness.inventory)}
@@ -717,7 +717,7 @@ export default function ExpeditionDetail() {
                         <p className="text-xs text-slate-500">{p.badgeId} · {p.roleTitle || 'Specialist'}</p>
                       </div>
                       <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[11px] font-mono font-bold text-cyan-600 dark:text-cyan-400">
-                        🩸 {p.userId?.bloodGroup || 'O+'}
+                        Blood: {p.userId?.bloodGroup || 'O+'}
                       </span>
                     </div>
 
@@ -752,7 +752,7 @@ export default function ExpeditionDetail() {
                     {/* Emergency Contact */}
                     {p.userId?.emergencyContact?.name && (
                       <p className="mt-2 text-[11px] text-slate-500 truncate">
-                        📞 SOS Contact: {p.userId.emergencyContact.name} ({p.userId.emergencyContact.relation}) · {p.userId.emergencyContact.phone}
+                        SOS Contact: {p.userId.emergencyContact.name} ({p.userId.emergencyContact.relation}) · {p.userId.emergencyContact.phone}
                       </p>
                     )}
 
@@ -766,7 +766,7 @@ export default function ExpeditionDetail() {
                             : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 hover:bg-amber-200'
                         }`}
                       >
-                        {inQuarantine ? '✓ Release Clearance' : '⚠️ Medical Quarantine'}
+                        {inQuarantine ? 'Release Clearance' : 'Medical Quarantine'}
                       </button>
 
                       {canMedical && (
@@ -1237,7 +1237,7 @@ export default function ExpeditionDetail() {
                   className="px-2.5 py-1 text-xs font-semibold rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center gap-1.5 transition-all shadow-sm"
                 >
                   <LocateFixed size={13} className={gpsLoading ? 'animate-spin' : ''} />
-                  {gpsLoading ? 'Acquiring GNSS...' : '🛰️ Acquire Device GPS'}
+                  {gpsLoading ? 'Acquiring GNSS...' : 'Acquire Device GPS'}
                 </button>
               </div>
 
@@ -1356,7 +1356,7 @@ export default function ExpeditionDetail() {
                 type="submit"
                 className={checkinForm.triggerSOS ? btnDanger + ' !px-5' : btnPrimary + ' !px-5'}
               >
-                {checkinForm.triggerSOS ? '🚨 Broadcast Emergency Check-In & SOS' : 'Submit Mission Check-In'}
+                {checkinForm.triggerSOS ? 'Broadcast Emergency Check-In & SOS' : 'Submit Mission Check-In'}
               </button>
             </div>
           </form>

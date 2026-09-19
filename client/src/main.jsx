@@ -9,3 +9,12 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+// Register POLARIS Offline Service Worker for Polar Field Terminals
+if ('serviceWorker' in navigator && !import.meta.env.DEV) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('POLARIS Service Worker registration failed:', err);
+    });
+  });
+}

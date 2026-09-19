@@ -35,6 +35,8 @@ router.get('/', async (req, res) => {
   const list = await Incident.find(filter)
     .populate('reportedBy', 'username fullName')
     .populate('affectedPersonnelIds', 'badgeId currentStatus currentLocation')
+    .populate('affectedAssetIds', 'assetTag name condition station')
+    .populate('responderIds', 'username fullName role')
     .sort({ createdAt: -1 }).limit(200);
   res.json(list);
 });
@@ -44,11 +46,11 @@ router.post('/', requireRoles(...CAN_MANAGE), validate(schemas.incidentCreate), 
   try {
     const inc = await Incident.create({ ...req.body, reportedBy: req.user.id });
     await addAction(inc._id, 'Report', `Incident reported at ${inc.location} (${inc.severity})`, req.user.id);
-    // Auto roll-call: personnel currently at the incident location
+    // Auto roll-call: personnel currently at the incident location (if not explicitly specified)
     const rollCall = inc.location
       ? await Personnel.find({ currentLocation: inc.location }).populate('userId', 'username fullName').limit(50)
       : [];
-    if (rollCall.length) {
+    if (rollCall.length && (!inc.affectedPersonnelIds || inc.affectedPersonnelIds.length === 0)) {
       inc.affectedPersonnelIds = rollCall.map(p => p._id);
       await inc.save();
       await addAction(inc._id, 'Note', `Auto roll-call: ${rollCall.length} personnel at ${inc.location}`, req.user.id);

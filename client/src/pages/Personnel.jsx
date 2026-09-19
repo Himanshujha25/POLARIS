@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, MapPin, Heart, Thermometer, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
@@ -231,7 +231,10 @@ export default function Personnel() {
         {Object.entries(groups).map(([loc, members]) => (
           <Card key={loc} className="p-3">
             <div className="flex items-center justify-between">
-              <p className="font-bold">📍 {loc}</p>
+              <p className="font-bold flex items-center gap-1.5">
+                <MapPin size={14} className="text-cyan-500" />
+                <span>{loc}</span>
+              </p>
               <span className="rounded-full bg-cyan-600/10 px-2 py-0.5 text-xs font-bold text-cyan-600 dark:text-cyan-300">{members.length}</span>
             </div>
             <ul className="mt-1 text-sm">
@@ -284,11 +287,19 @@ export default function Personnel() {
                   <Td>{p.userId?.fullName || p.userId?.username}</Td>
                   <Td><Pill value={p.currentStatus} /></Td>
                   <Td>
-                    <div className="flex flex-col text-xs leading-tight">
-                      <span className="font-semibold text-rose-500">❤️ {p.vitals?.heartRate ? `${p.vitals.heartRate} bpm` : '—'}</span>
-                      <span className={`${p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 ? 'text-amber-500 font-bold' : 'text-slate-500 dark:text-slate-400'}`}>
-                        🌡️ {p.vitals?.bodyTempC ? `${p.vitals.bodyTempC}°C` : '—'}
-                        {p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 && ' ⚠️ Low'}
+                    <div className="flex flex-col text-xs leading-tight gap-1">
+                      <span className="font-semibold text-rose-500 flex items-center gap-1">
+                        <Heart size={10} className="shrink-0" />
+                        <span>{p.vitals?.heartRate ? `${p.vitals.heartRate} bpm` : '—'}</span>
+                      </span>
+                      <span className={`flex items-center gap-1 ${p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 ? 'text-amber-500 font-bold' : 'text-slate-500 dark:text-slate-400'}`}>
+                        <Thermometer size={10} className="shrink-0" />
+                        <span>{p.vitals?.bodyTempC ? `${p.vitals.bodyTempC}°C` : '—'}</span>
+                        {p.vitals?.bodyTempC && p.vitals.bodyTempC < 35 && (
+                          <span className="inline-flex items-center gap-0.5 text-amber-500 font-bold ml-0.5">
+                            <AlertTriangle size={9} /> Low
+                          </span>
+                        )}
                       </span>
                     </div>
                   </Td>
@@ -422,7 +433,7 @@ export default function Personnel() {
                   );
                   return (
                     <option key={u._id} value={u._id} disabled={isAlreadyDeployed}>
-                      {u.fullName || u.username} ({u.role}) {isAlreadyDeployed ? '— [Already Deployed]' : '✓ Available'}
+                      {u.fullName || u.username} ({u.role}) {isAlreadyDeployed ? '— [Already Deployed]' : '— Available'}
                     </option>
                   );
                 })}

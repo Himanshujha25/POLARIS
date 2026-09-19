@@ -26,9 +26,16 @@ router.get('/expedition/:id', async (req, res) => {
     Cargo.find({ expeditionId: exp._id }),
     Inventory.find(),
     Asset.find(),
-    Incident.find({ expeditionId: exp._id }).sort({ createdAt: -1 }),
+    Incident.find({ expeditionId: exp._id })
+      .populate('reportedBy', 'fullName username role badgeId')
+      .populate('responderIds', 'fullName username role badgeId')
+      .sort({ createdAt: -1 }),
     PersonnelMovement.find({ expeditionId: exp._id }).populate('personnelId', 'badgeId').sort({ createdAt: -1 }).limit(50)
   ]);
+  const incidentIds = incidents.map(i => i._id);
+  const incidentActions = await IncidentAction.find({ incidentId: { $in: incidentIds } })
+    .populate('createdBy', 'fullName username role')
+    .sort({ createdAt: 1 });
   const cargoEvents = await CargoEvent.find({ cargoId: { $in: cargos.map(c => c._id) } }).sort({ createdAt: -1 }).limit(50);
   const txns = await InventoryTransaction.find().sort({ createdAt: -1 }).limit(50);
   const byLoc = {};
@@ -44,6 +51,7 @@ router.get('/expedition/:id', async (req, res) => {
     inventory,
     assets,
     incidents,
+    incidentActions,
     recentMovements: movements,
     recentCargoEvents: cargoEvents,
     recentTransactions: txns,
