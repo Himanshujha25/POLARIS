@@ -10,8 +10,12 @@ export default function OfflineSyncBanner() {
   const [lastSyncResult, setLastSyncResult] = useState(null);
 
   const checkQueue = async () => {
-    const queue = await getQueuedMutations();
-    setPendingCount(queue.length);
+    try {
+      const queue = await getQueuedMutations();
+      setPendingCount(Array.isArray(queue) ? queue.length : 0);
+    } catch {
+      setPendingCount(0);
+    }
   };
 
   useEffect(() => {
