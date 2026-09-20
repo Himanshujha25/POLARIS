@@ -187,4 +187,28 @@ router.get('/track/:trackingNumber', async (req, res) => {
   res.json(cargo);
 });
 
+// POST /api/v1/cargo/ocr — High-speed neural optical character recognition
+router.post('/ocr', async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'Image data is required (base64 string or data URL)' });
+    }
+    if (image.length > 15 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Payload too large: image exceeds 15MB limit' });
+    }
+
+    const Tesseract = require('tesseract.js');
+    const result = await Tesseract.recognize(image, 'eng');
+    const text = (result?.data?.text || '').trim();
+    const confidence = result?.data?.confidence ?? null;
+
+    res.json({ text, confidence, success: true });
+  } catch (err) {
+    console.error('[OCR Engine Error]', err.message);
+    res.status(500).json({ error: 'Failed to process image with OCR engine', details: err.message });
+  }
+});
+
 module.exports = router;
+

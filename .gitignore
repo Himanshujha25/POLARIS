@@ -26,3 +26,8 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+
+# OCR model caches
+*.traineddata
+*.traineddata.gz
+
