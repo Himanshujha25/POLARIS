@@ -131,11 +131,11 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-[#09101c]">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <div className="grid gap-8 sm:grid-cols-[1.5fr_1fr_1fr]">
-            <div>
+      {/* Footer - Full Width Edge-to-Edge */}
+      <footer className="border-t border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-[#09101c] w-full">
+        <div className="w-full px-0 py-12">
+          <div className="grid gap-10 sm:grid-cols-[2fr_1fr_1fr_1fr]">
+            <div className="pl-6">
               <Link to="/" className="flex items-center gap-2 text-slate-900 dark:text-white">
                 <Snowflake className="text-cyan-500" size={22} />
                 <span className="font-extrabold tracking-wide">POLARIS</span>
@@ -164,10 +164,19 @@ export default function Landing() {
                 Expedition safety · logistics · response
               </p>
             </div>
+            <div className="pr-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">Tech Stack</p>
+              <div className="mt-3 flex flex-col gap-1.5 text-sm text-slate-500 dark:text-slate-400">
+                <span>React · Vite · TailwindCSS</span>
+                <span>Node.js · Express</span>
+                <span>MongoDB Atlas · Socket.IO</span>
+                <span>Leaflet · Gemini AI</span>
+              </div>
+            </div>
           </div>
-          <div className="mt-8 flex flex-col gap-2 border-t border-slate-200 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-            <p>© 2026 POLARIS Mission Control</p>
-            <p>React · Node.js · MongoDB Atlas · Socket.IO · Leaflet</p>
+          <div className="mt-10 flex flex-col gap-2 border-t border-slate-200 pt-5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500 sm:flex-row sm:items-center sm:justify-between px-6">
+            <p>© 2026 POLARIS Mission Control · National Centre for Polar and Ocean Research (NCPOR)</p>
+            <p>Ministry of Earth Sciences, Government of India</p>
           </div>
         </div>
       </footer>
