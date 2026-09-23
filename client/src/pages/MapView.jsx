@@ -554,11 +554,10 @@ export default function MapView() {
 
       {/* Live Device Location Bar */}
       {myPos && !dismissGpsBar && (
-        <div className="relative rounded-2xl border border-cyan-200/90 dark:border-cyan-500/30 bg-gradient-to-r from-cyan-50/95 via-blue-50/80 to-slate-50/90 dark:from-cyan-950/40 dark:via-slate-900/60 dark:to-slate-900/80 p-4 shadow-sm dark:shadow-md text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+        <div className="relative rounded-xl border border-blue-200 dark:border-blue-900/70 bg-blue-50/90 dark:bg-blue-950/40 p-4 shadow-xs text-xs flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-start sm:items-center gap-3 pr-8 sm:pr-0">
-            <div className="relative flex h-3 w-3 mt-1 sm:mt-0 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-600 dark:bg-cyan-400"></span>
+            <div className="relative flex size-3 mt-1 sm:mt-0 shrink-0">
+              <span className="relative inline-flex rounded-full size-3 bg-blue-600 dark:bg-blue-400"></span>
             </div>
             <div className="space-y-0.5">
               <div className="font-extrabold text-cyan-900 dark:text-cyan-300 flex flex-wrap items-center gap-2 text-xs sm:text-sm">

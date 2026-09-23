@@ -231,18 +231,18 @@ export default function Reports() {
             type="button"
             onClick={generateAISitrep}
             disabled={sitrepLoading}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 transition-all hover:opacity-90 disabled:opacity-60 cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-60 transition-colors cursor-pointer"
             title="Generate official 24-hour NCPOR & Ministry SITREP from live station data"
           >
             {sitrepLoading ? (
               <>
-                <Loader2 size={14} className="animate-spin text-cyan-200" />
+                <Loader2 size={14} className="animate-spin text-blue-200" />
                 <span>Generating SITREP...</span>
               </>
             ) : (
               <>
-                <Sparkles size={14} className="text-cyan-200 animate-pulse" />
-                <span>✦ Generate 24h AI SITREP Briefing</span>
+                <Sparkles size={14} className="text-blue-200" aria-hidden="true" />
+                <span>Generate 24h AI SITREP Briefing</span>
               </>
             )}
           </button>
@@ -401,7 +401,7 @@ export default function Reports() {
 
                   <button
                     onClick={() => setShowSitrepModal(false)}
-                    className="rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:opacity-95 transition-opacity cursor-pointer"
+                    className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 transition-colors cursor-pointer"
                   >
                     Done
                   </button>
@@ -412,7 +412,7 @@ export default function Reports() {
         >
           {sitrepLoading ? (
             <div className="flex flex-col items-center justify-center my-auto py-28 text-center gap-3">
-              <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 dark:border-slate-800 border-t-cyan-500" />
+              <div className="size-7 animate-spin rounded-full border-2 border-slate-200 dark:border-slate-800 border-t-blue-600" />
               <p className="text-xs font-medium text-slate-400 dark:text-slate-500 tracking-wide">
                 Generating SITREP...
               </p>

@@ -230,11 +230,12 @@ export default function Analytics() {
 
           {/* Print Audit */}
           <button
+            type="button"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:opacity-95 transition-opacity cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 transition-colors cursor-pointer"
             title="Export official printable data audit report"
           >
-            <Printer size={13} />
+            <Printer size={13} aria-hidden="true" />
             <span>Print Audit</span>
           </button>
         </div>
@@ -242,11 +243,11 @@ export default function Analytics() {
 
       {/* Station Focus Filter Notice */}
       {activeStationData && (
-        <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs">
+        <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+            <span className="size-2 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0" aria-hidden="true" />
             <span className="font-bold text-slate-800 dark:text-slate-100">
-              Station Telemetry Filter: <span className="text-cyan-600 dark:text-cyan-400 font-extrabold">{activeStationData.station}</span>
+              Station Telemetry Filter: <span className="text-blue-700 dark:text-blue-300 font-extrabold">{activeStationData.station}</span>
             </span>
             <span className="text-slate-400">|</span>
             <span className="text-slate-500 dark:text-slate-300">

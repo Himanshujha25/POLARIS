@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { generateAIResponse } = require('../services/aiService');
 const { buildPolarisLiveContext } = require('../services/aiContext');
+const { authRequired } = require('../middleware/auth');
 
-// GET /api/v1/ai/status - Provider availability & configuration health
+// GET /api/v1/ai/status - Provider availability & configuration health (Public health check)
 router.get('/status', (req, res) => {
   const geminiConfigured = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5);
   const groqConfigured = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim().length > 5);
@@ -26,6 +27,9 @@ router.get('/status', (req, res) => {
     }
   });
 });
+
+// Protect all generative & analytical AI endpoints with authentication
+router.use(authRequired);
 
 // POST /api/v1/ai/chat - Universal Copilot conversational assistant
 router.post('/chat', async (req, res) => {
