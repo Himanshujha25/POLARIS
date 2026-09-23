@@ -2,18 +2,24 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Ship, CheckCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useLiveRefresh } from '../../lib/useLive';
 import { Card, StatCard, Pill, Spinner, Empty, btnGhost } from '../../components/ui';
 
 export default function CargoDashboard() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const load = async () => {
+    try { setList(await api('/api/v1/cargo')); } catch { /* ignore */ }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    (async () => {
-      try { setList(await api('/api/v1/cargo')); } catch { /* ignore */ }
-      setLoading(false);
-    })();
+    load();
+    const interval = setInterval(load, 8000);
+    return () => clearInterval(interval);
   }, []);
+  useLiveRefresh(load);
 
   if (loading) return <Spinner />;
   const inTransit = list.filter(c => c.status === 'InTransit');

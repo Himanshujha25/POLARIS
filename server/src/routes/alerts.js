@@ -50,15 +50,48 @@ router.post('/sos', validate(schemas.sos), async (req, res) => {
   res.status(201).json(alert);
 });
 
+// POST /api/v1/alerts/clear-all — Clear/acknowledge all active alerts from DB
+router.post('/clear-all', async (req, res) => {
+  const userId = req.user?.id || req.user?._id;
+  const result = await Alert.updateMany(
+    { isAcknowledged: false },
+    { $set: { isAcknowledged: true, acknowledgedBy: userId, resolvedAt: new Date() } }
+  );
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('alerts:cleared', { clearedCount: result.modifiedCount, acknowledgedBy: userId });
+  }
+  res.json({ ok: true, clearedCount: result.modifiedCount });
+});
+
 // PATCH /api/v1/alerts/:id/acknowledge
-router.patch('/:id/acknowledge', requireRoles('SuperAdmin', 'ExpeditionManager', 'EmergencyOfficer'), async (req, res) => {
+router.patch('/:id/acknowledge', async (req, res) => {
   const alert = await Alert.findById(req.params.id);
-  if (!alert) return res.status(404).json({ error: 'Not found' });
+  if (!alert) return res.status(404).json({ error: 'Alert not found' });
   alert.isAcknowledged = true;
-  alert.acknowledgedBy = req.user.id;
+  alert.acknowledgedBy = req.user?.id || req.user?._id;
   alert.resolvedAt = new Date();
   await alert.save();
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('alert:acknowledged', { alertId: alert._id, alert });
+  }
   res.json(alert);
+});
+
+// DELETE /api/v1/alerts/:id — Dismiss individual alert
+router.delete('/:id', async (req, res) => {
+  const alert = await Alert.findById(req.params.id);
+  if (!alert) return res.status(404).json({ error: 'Alert not found' });
+  alert.isAcknowledged = true;
+  alert.acknowledgedBy = req.user?.id || req.user?._id;
+  alert.resolvedAt = new Date();
+  await alert.save();
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('alert:acknowledged', { alertId: alert._id });
+  }
+  res.json({ ok: true, alertId: alert._id });
 });
 
 // POST /api/v1/alerts/simulate-telemetry — SIH demo harness

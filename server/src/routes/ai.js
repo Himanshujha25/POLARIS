@@ -122,9 +122,19 @@ Generate an immediate Antarctic Emergency SOP Plan:
 // POST /api/v1/ai/sitrep-summary - 24-Hour NCPOR Executive Situation Report
 router.post('/sitrep-summary', async (req, res) => {
   try {
+    const { expeditionId } = req.body || {};
     const ctx = await buildPolarisLiveContext();
+    const Expedition = require('../models/Expedition');
+    let expDetails = '';
+    if (expeditionId) {
+      const exp = await Expedition.findById(expeditionId).catch(() => null);
+      if (exp) {
+        expDetails = `\n- Target Mission: ${exp.expeditionCode} (${exp.title}) at ${exp.targetStation || 'Antarctica'}`;
+      }
+    }
+
     const prompt = `Generate an official 24-Hour Executive SITREP (Situation Report) for NCPOR Headquarters, Goa & Ministry of Earth Sciences:
-- Station: ${ctx.weather.primaryStation}
+- Station: ${ctx.weather.primaryStation}${expDetails}
 - Surface Conditions: Temp ${ctx.weather.temperatureC}°C, Wind ${ctx.weather.windKnots} kts, Barometer ${ctx.weather.pressureHpa} hPa
 - Station Crew: ${ctx.personnel.totalOnIce} On-Ice (${ctx.personnel.activeFieldParties} in Field)
 - Machinery Status: ${ctx.assets.operableCount} Operable / ${ctx.assets.maintenanceCount} in Maintenance
@@ -143,6 +153,8 @@ Format in clean executive headers:
       sitrep: aiResult.text,
       provider: aiResult.provider,
       model: aiResult.model,
+      attempts: aiResult.attempts || [aiResult.provider],
+      fallbackNotice: aiResult.fallbackNotice || (aiResult.attempts?.length > 1 ? `Fell back from ${aiResult.attempts[0]} to ${aiResult.provider}` : null),
       date: new Date().toISOString()
     });
   } catch (err) {

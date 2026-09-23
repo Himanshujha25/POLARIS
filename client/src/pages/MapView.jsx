@@ -75,7 +75,11 @@ export default function MapView() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [focusBadge]);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, [focusBadge]);
   useLiveRefresh(load);
 
   // Detect active SOS / Deadman timeout alerts
@@ -87,12 +91,56 @@ export default function MapView() {
     return { personnel: distressPersonnel, alerts: distressAlerts };
   }, [personnel, alerts]);
 
+  // Distress banner dismissal & stand-down state
+  const [distressDismissed, setDistressDismissed] = useState(false);
+  const [clearingDistress, setClearingDistress] = useState(false);
+
+  // Reset dismissal if distress status clears
+  useEffect(() => {
+    if (activeDistress.personnel.length === 0 && activeDistress.alerts.length === 0) {
+      setDistressDismissed(false);
+    }
+  }, [activeDistress.personnel.length, activeDistress.alerts.length]);
+
+  const handleCloseBanner = () => {
+    stopSiren();
+    setDistressDismissed(true);
+  };
+
+  const handleStandDownSOS = async () => {
+    setClearingDistress(true);
+    stopSiren();
+    try {
+      for (const a of activeDistress.alerts) {
+        await api(`/api/v1/alerts/${a._id}/acknowledge`, { method: 'PATCH' }).catch(() => {});
+      }
+      for (const p of activeDistress.personnel) {
+        await api('/api/v1/personnel/checkin', {
+          method: 'POST',
+          body: {
+            badgeId: p.badgeId,
+            status: 'StationHab',
+            location: p.currentCoordinates?.lat ? `Base (${p.currentCoordinates.lat.toFixed(2)}, ${p.currentCoordinates.lng.toFixed(2)})` : 'Station Hab',
+            notes: 'Emergency distress resolved and stood down from Tactical Map'
+          }
+        }).catch(() => {});
+      }
+      setDistressDismissed(true);
+      await load();
+    } catch (err) {
+      console.warn('[distress] stand-down error:', err.message);
+    } finally {
+      setClearingDistress(false);
+    }
+  };
+
   // User's own live GNSS position & real address
   const { user } = useAuth();
   const [myPos, setMyPos] = useState(null);
   const [myAccuracy, setMyAccuracy] = useState(null);
   const [myAddress, setMyAddress] = useState('');
   const [locatingUser, setLocatingUser] = useState(false);
+  const [dismissGpsBar, setDismissGpsBar] = useState(false);
   const [syncingRoster, setSyncingRoster] = useState(false);
   const [syncNotice, setSyncNotice] = useState('');
   const [targetBadge, setTargetBadge] = useState('BHR-3');
@@ -221,6 +269,7 @@ export default function MapView() {
       return;
     }
     setLocatingUser(true);
+    setDismissGpsBar(false);
     setSyncNotice('');
     playRadioChirp();
     navigator.geolocation.getCurrentPosition(
@@ -416,36 +465,75 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* Active Distress Beacon Alarm Banner */}
-      {(activeDistress.personnel.length > 0 || activeDistress.alerts.length > 0) && (
-        <div className="p-3.5 rounded-lg border border-red-500 bg-red-500/15 text-red-400 flex flex-wrap items-center justify-between gap-3 shadow-lg animate-pulse">
-          <div className="flex items-center gap-3">
-            <Siren size={24} className="text-red-500 animate-bounce" />
-            <div>
-              <p className="font-extrabold text-sm uppercase tracking-wider text-red-300">
-                CRITICAL EMERGENCY DISTRESS BEACON ACTIVE
-              </p>
-              <p className="text-xs text-red-200/90 mt-0.5">
-                {activeDistress.personnel.length > 0
-                  ? `Crew member (${activeDistress.personnel.map(p => p.badgeId).join(', ')}) in SOS DISTRESS status!`
-                  : `Dead-man countdown timeout triggered (${activeDistress.alerts.length} active emergency alert)!`}
-              </p>
+      {/* Active Distress Beacon Alarm Banner - Fully synced with POLARIS design system */}
+      {!distressDismissed && (activeDistress.personnel.length > 0 || activeDistress.alerts.length > 0) && (
+        <div className="relative overflow-hidden rounded-2xl border border-rose-300/80 bg-rose-50/90 dark:border-rose-900/60 dark:bg-rose-950/40 p-4 shadow-sm backdrop-blur-md transition-all">
+          {/* Emergency left accent stripe */}
+          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-rose-600 dark:bg-rose-500" />
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pl-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400">
+                <Siren size={20} className="animate-bounce" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-xs uppercase tracking-wider text-rose-800 dark:text-rose-200">
+                    Critical Emergency Distress Beacon Active
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-900/60 px-2 py-0.5 text-[10px] font-bold text-rose-800 dark:text-rose-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-ping" />
+                    Live SOS
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                  {activeDistress.personnel.length > 0
+                    ? `Crew member (${activeDistress.personnel.map(p => p.badgeId).join(', ')}) in SOS DISTRESS status!`
+                    : `Dead-man countdown timeout triggered (${activeDistress.alerts.length} active emergency alert)!`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const targetP = activeDistress.personnel[0];
+                  if (targetP?.currentCoordinates?.lat) {
+                    setFlyTarget({ lat: targetP.currentCoordinates.lat, lng: targetP.currentCoordinates.lng, zoom: 15 });
+                  } else if (activeDistress.alerts[0]?.coordinates?.lat) {
+                    setFlyTarget({ lat: activeDistress.alerts[0].coordinates.lat, lng: activeDistress.alerts[0].coordinates.lng, zoom: 15 });
+                  }
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3.5 py-2 shadow-xs transition-all cursor-pointer"
+                title="Zoom and focus map on active distress coordinates"
+              >
+                <Crosshair size={14} />
+                <span>Intercept / Locate Beacon</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleStandDownSOS}
+                disabled={clearingDistress}
+                className="flex items-center gap-1 rounded-xl border border-rose-300 dark:border-rose-800 bg-white/90 dark:bg-slate-900/80 px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-all cursor-pointer"
+                title="Acknowledge distress and stand down SOS status"
+              >
+                <CheckCircle2 size={14} className="text-emerald-500" />
+                <span>{clearingDistress ? 'Resolving...' : 'Stand Down SOS'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCloseBanner}
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                title="Dismiss alert banner"
+                aria-label="Close alert"
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => {
-              const targetP = activeDistress.personnel[0];
-              if (targetP?.currentCoordinates?.lat) {
-                setFlyTarget({ lat: targetP.currentCoordinates.lat, lng: targetP.currentCoordinates.lng, zoom: 15 });
-              } else if (activeDistress.alerts[0]?.coordinates?.lat) {
-                setFlyTarget({ lat: activeDistress.alerts[0].coordinates.lat, lng: activeDistress.alerts[0].coordinates.lng, zoom: 15 });
-              }
-            }}
-            className={`${btnDanger} !py-1.5 !px-4 text-xs font-bold flex items-center gap-1.5 shadow-md`}
-          >
-            <Crosshair size={14} />
-            Intercept / Locate Beacon
-          </button>
         </div>
       )}
 
@@ -465,39 +553,47 @@ export default function MapView() {
       )}
 
       {/* Live Device Location Bar */}
-      {myPos && (
-        <div className="p-3.5 rounded-lg border border-cyan-500 bg-cyan-950/20 text-xs flex flex-wrap items-center justify-between gap-3 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-3 w-3">
+      {myPos && !dismissGpsBar && (
+        <div className="relative rounded-2xl border border-cyan-200/90 dark:border-cyan-500/30 bg-gradient-to-r from-cyan-50/95 via-blue-50/80 to-slate-50/90 dark:from-cyan-950/40 dark:via-slate-900/60 dark:to-slate-900/80 p-4 shadow-sm dark:shadow-md text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-start sm:items-center gap-3 pr-8 sm:pr-0">
+            <div className="relative flex h-3 w-3 mt-1 sm:mt-0 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-600 dark:bg-cyan-400"></span>
             </div>
-            <div>
-              <div className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">
-                <LocateFixed size={15} />
-                Exact Device Position Identified (Accuracy: ±{myAccuracy}m)
+            <div className="space-y-0.5">
+              <div className="font-extrabold text-cyan-900 dark:text-cyan-300 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                <span className="flex items-center gap-1.5">
+                  <LocateFixed size={16} className="text-cyan-600 dark:text-cyan-400 shrink-0" />
+                  Exact Device Position Identified
+                </span>
+                <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-100/90 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-700/50">
+                  ±{myAccuracy}m accuracy
+                </span>
               </div>
-              <div className="text-slate-300 font-mono text-xs mt-0.5 max-w-2xl truncate" title={myAddress}>
+              <div className="text-slate-700 dark:text-slate-300 font-medium text-xs max-w-2xl truncate leading-relaxed" title={myAddress}>
                 {myAddress || 'Location determined by GNSS'}
               </div>
-              <div className="text-[11px] font-mono text-cyan-500/80 mt-0.5">
-                Latitude: {myPos.lat.toFixed(6)}° • Longitude: {myPos.lng.toFixed(6)}°
+              <div className="text-[11px] font-mono text-cyan-700 dark:text-cyan-400/90 flex items-center gap-2 pt-0.5">
+                <span>Latitude: <b>{myPos.lat.toFixed(6)}°</b></span>
+                <span>•</span>
+                <span>Longitude: <b>{myPos.lng.toFixed(6)}°</b></span>
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
             <button
               onClick={() => setFlyTarget({ lat: myPos.lat, lng: myPos.lng, zoom: 16 })}
-              className={`${btnGhost} !px-3 !py-1 text-xs text-cyan-400 hover:border-cyan-400 font-semibold`}
+              className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <Crosshair size={13} className="inline mr-1" />
-              Center on Device
+              <Crosshair size={13} className="text-cyan-600 dark:text-cyan-400" />
+              <span>Center on Device</span>
             </button>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <select
                 value={targetBadge}
                 onChange={e => setTargetBadge(e.target.value)}
-                className="bg-slate-900 border border-slate-700 text-xs text-cyan-300 rounded px-2 py-1 font-mono font-bold"
+                className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-cyan-300 px-2.5 py-1.5 font-mono shadow-xs focus:ring-1 focus:ring-cyan-500 outline-none cursor-pointer"
               >
                 {personnel.map(p => (
                   <option key={p.badgeId} value={p.badgeId}>{p.badgeId} ({p.currentStatus})</option>
@@ -506,12 +602,20 @@ export default function MapView() {
               <button
                 onClick={() => handleSyncToRoster(targetBadge)}
                 disabled={syncingRoster}
-                className={`${btnPrimary} !px-3.5 !py-1 text-xs font-bold shadow-sm flex items-center gap-1.5`}
+                className={`${btnPrimary} !px-3.5 !py-1.5 text-xs font-bold shadow-xs flex items-center gap-1.5`}
               >
                 <Satellite size={13} />
-                {syncingRoster ? 'Broadcasting...' : `Set ${targetBadge} to Device GPS`}
+                <span>{syncingRoster ? 'Broadcasting...' : `Set ${targetBadge} to Device GPS`}</span>
               </button>
             </div>
+            <button
+              onClick={() => setDismissGpsBar(true)}
+              className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors cursor-pointer ml-1"
+              title="Dismiss GPS banner"
+              aria-label="Dismiss GPS banner"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
       )}

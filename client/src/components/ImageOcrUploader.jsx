@@ -75,6 +75,7 @@ export default function ImageOcrUploader({
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.90);
       console.log('%c[POLARIS OCR] 🎨 STEP 3: Downsampled to Canvas:', 'color: #38bdf8;', `${width} x ${height} px`);
+      onImageChange(dataUrl);
       runOcr(dataUrl, file.name);
     };
 
@@ -82,6 +83,7 @@ export default function ImageOcrUploader({
       console.warn('%c[POLARIS OCR] ⚠️ HTMLImage decode error, running directly on File object', 'color: #f59e0b;');
       try {
         const dataUrl = await blobToDataUrl(file);
+        onImageChange(dataUrl);
         runOcr(dataUrl, file.name);
       } catch (e) {
         runOcr(file, file.name);
@@ -105,9 +107,8 @@ export default function ImageOcrUploader({
       setScanning(true);
       const res = await fetch(path);
       const blob = await res.blob();
-      const previewUrl = URL.createObjectURL(blob);
-      onImageChange(previewUrl);
       const dataUrl = await blobToDataUrl(blob);
+      onImageChange(dataUrl);
       runOcr(dataUrl, path.split('/').pop());
     } catch (err) {
       console.warn('%c[POLARIS OCR] ⚠️ Demo image fetch failed, using instant preset:', 'color: #f59e0b;', err);

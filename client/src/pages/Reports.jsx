@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { 
   Printer, 
   FileText, 
@@ -15,11 +15,17 @@ import {
   LayoutDashboard,
   Ship,
   ShieldAlert,
-  Droplets
+  Droplets,
+  Sparkles,
+  Loader2,
+  Copy,
+  Check,
+  ChevronDown
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { Card, Pill, Spinner, Empty, Field, inputCls, btnGhost, btnPrimary, TableWrap, Th, Td } from '../components/ui';
+import { Card, Pill, Spinner, Empty, Field, inputCls, btnGhost, btnPrimary, TableWrap, Th, Td, Modal, CustomSelect } from '../components/ui';
 import { exportCargoCustomsManifest, exportLifeSupportFuelAudit } from '../lib/reportGenerator';
+import MarkdownContent from '../components/MarkdownContent';
 
 const REPORT_FORMS = [
   { id: 'readiness', label: 'Mission Overview', icon: LayoutDashboard, formNo: 'MoES/POLAR/GEN-01' },
@@ -31,17 +37,70 @@ const REPORT_FORMS = [
 export default function Reports() {
   const [exps, setExps] = useState([]);
   const [expId, setExpId] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const [report, setReport] = useState(null);
   const [activeForm, setActiveForm] = useState('readiness');
   const [loading, setLoading] = useState(true);
   const [selectedIncidentId, setSelectedIncidentId] = useState('');
 
+  // Close custom dropdown when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // AI SITREP State
+  const [showSitrepModal, setShowSitrepModal] = useState(false);
+  const [sitrepLoading, setSitrepLoading] = useState(false);
+  const [sitrepData, setSitrepData] = useState(null);
+  const [copiedSitrep, setCopiedSitrep] = useState(false);
+
+  const generateAISitrep = async () => {
+    setShowSitrepModal(true);
+    setSitrepLoading(true);
+    setSitrepData(null);
+    try {
+      const res = await api('/api/v1/ai/sitrep-summary', {
+        method: 'POST',
+        body: { expeditionId: expId }
+      });
+      setSitrepData(res);
+    } catch (err) {
+      setSitrepData({
+        sitrep: 'SITREP generation notice: ' + (err.message || 'Server timeout'),
+        provider: 'offline'
+      });
+    } finally {
+      setSitrepLoading(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
         const e = await api('/api/v1/expeditions');
-        setExps(e);
-        if (e[0]) setExpId(e[0]._id);
+        // Filter out TEST- smoke records and prioritize official Antarctic expeditions
+        const valid = (e || []).filter(x => !x.expeditionCode?.startsWith('TEST-'));
+        valid.sort((a, b) => {
+          if (a.expeditionCode?.startsWith('44-ISEA') && !b.expeditionCode?.startsWith('44-ISEA')) return -1;
+          if (!a.expeditionCode?.startsWith('44-ISEA') && b.expeditionCode?.startsWith('44-ISEA')) return 1;
+          return (a.expeditionCode || '').localeCompare(b.expeditionCode || '');
+        });
+        setExps(valid);
+        if (valid[0]) setExpId(valid[0]._id);
       } catch { /* ignore */ }
       setLoading(false);
     })();
@@ -68,6 +127,8 @@ export default function Reports() {
 
   if (loading) return <Spinner />;
 
+  const selectedExp = exps.find(x => x._id === expId) || exps[0];
+
   return (
     <div className="flex flex-col gap-5">
       {/* Top action bar (hidden during print) */}
@@ -83,24 +144,113 @@ export default function Reports() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Field label="">
-            <select 
-              className={inputCls + ' !py-1.5 text-xs font-semibold'} 
-              value={expId} 
-              onChange={e => setExpId(e.target.value)}
+          {/* Custom SaaS Floating Expedition Dropdown */}
+          <div className="relative min-w-[280px] sm:min-w-[360px] max-w-lg" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(prev => !prev)}
+              aria-expanded={isDropdownOpen}
+              className={`w-full flex items-center justify-between gap-2.5 rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 py-2 px-3.5 text-xs font-semibold shadow-xs transition-all cursor-pointer ${
+                isDropdownOpen 
+                  ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-md' 
+                  : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
+              }`}
             >
-              {exps.map(x => (
-                <option key={x._id} value={x._id}>
-                  {x.expeditionCode} — {x.title} ({x.targetStation})
-                </option>
-              ))}
-            </select>
-          </Field>
+              <div className="flex items-center gap-2 truncate min-w-0">
+                <Compass size={15} className="text-cyan-500 shrink-0" />
+                {selectedExp ? (
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400 shrink-0">
+                      {selectedExp.expeditionCode}
+                    </span>
+                    <span className="text-slate-400 dark:text-slate-500">·</span>
+                    <span className="truncate text-slate-700 dark:text-slate-200">
+                      {selectedExp.title}
+                    </span>
+                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 font-medium text-slate-600 dark:text-slate-300">
+                      {selectedExp.targetStation || 'Antarctica'}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-slate-400">Select Expedition...</span>
+                )}
+              </div>
+              <ChevronDown 
+                size={14} 
+                className={`text-slate-400 shrink-0 transition-transform duration-200 ml-1.5 ${isDropdownOpen ? 'rotate-180 text-cyan-500' : ''}`} 
+              />
+            </button>
+
+            {/* Floating Dropdown Menu */}
+            {isDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md shadow-2xl p-1.5 flex flex-col gap-1 max-h-80 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono flex items-center justify-between">
+                  <span>Official Expeditions</span>
+                  <span className="bg-cyan-500/10 text-cyan-500 px-1.5 py-0.2 rounded text-[9px]">{exps.length} active</span>
+                </div>
+                {exps.length === 0 ? (
+                  <p className="px-3 py-3 text-xs text-slate-400 italic text-center">No expeditions available</p>
+                ) : (
+                  exps.map(x => {
+                    const isSelected = x._id === expId;
+                    return (
+                      <button
+                        key={x._id}
+                        type="button"
+                        onClick={() => {
+                          setExpId(x._id);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-left transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-cyan-50 text-cyan-950 font-bold dark:bg-cyan-950/50 dark:text-cyan-200 ring-1 ring-cyan-500/30'
+                            : 'text-slate-700 hover:bg-slate-100/80 dark:text-slate-200 dark:hover:bg-slate-800/80'
+                        }`}
+                      >
+                        <div className="flex flex-col gap-0.5 truncate min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-xs text-cyan-600 dark:text-cyan-400">{x.expeditionCode}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                              {x.targetStation || 'Antarctica'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                            {x.title}
+                          </span>
+                        </div>
+                        {isSelected && <Check size={15} className="text-cyan-600 dark:text-cyan-400 shrink-0" />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={generateAISitrep}
+            disabled={sitrepLoading}
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 transition-all hover:opacity-90 disabled:opacity-60 cursor-pointer"
+            title="Generate official 24-hour NCPOR & Ministry SITREP from live station data"
+          >
+            {sitrepLoading ? (
+              <>
+                <Loader2 size={14} className="animate-spin text-cyan-200" />
+                <span>Generating SITREP...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} className="text-cyan-200 animate-pulse" />
+                <span>✦ Generate 24h AI SITREP Briefing</span>
+              </>
+            )}
+          </button>
 
           <button
             type="button"
             onClick={handlePrint}
-            className={`${btnPrimary} !py-1.5 !px-3 text-xs flex items-center gap-1.5 shadow-sm`}
+            className={`${btnPrimary} !py-2 !px-3.5 text-xs flex items-center gap-1.5 shadow-xs`}
           >
             <Printer size={15} />
             <span>Print / Save PDF Form</span>
@@ -186,6 +336,112 @@ export default function Reports() {
           }
         }
       `}</style>
+
+      {/* AI 24h SITREP Modal (Root Level: Accessible From Any Tab) */}
+      {showSitrepModal && (
+        <Modal
+          title={
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
+                <Sparkles size={16} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-sm tracking-wide text-slate-900 dark:text-white">
+                    24-Hour Polar Executive SITREP
+                  </span>
+                  <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 uppercase">
+                    AI Dispatch
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                  MoES / NCPOR Polar Operations Classified Dispatch
+                </p>
+              </div>
+            </div>
+          }
+          maxWidth="max-w-3xl"
+          className="h-[84vh] max-h-[86vh] shadow-2xl border-slate-300 dark:border-slate-800"
+          bodyClassName="p-0 flex flex-col min-h-0 overflow-hidden bg-slate-50/50 dark:bg-[#0b1220]"
+          onClose={() => setShowSitrepModal(false)}
+          footer={
+            sitrepData ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-mono text-[11px] font-bold border border-emerald-200 dark:border-emerald-800">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    {sitrepData.provider?.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {sitrepData.model}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-xs transition-colors"
+                    title="Print official dispatch sheet"
+                  >
+                    <Printer size={13} />
+                    <span className="hidden sm:inline">Print Dispatch</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(sitrepData.sitrep);
+                      setCopiedSitrep(true);
+                      setTimeout(() => setCopiedSitrep(false), 2000);
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-xs transition-colors"
+                  >
+                    {copiedSitrep ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                    <span>{copiedSitrep ? 'Copied' : 'Copy Briefing'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowSitrepModal(false)}
+                    className="rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:opacity-95 transition-opacity cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : null
+          }
+        >
+          {sitrepLoading ? (
+            <div className="flex flex-col items-center justify-center my-auto py-28 text-center gap-3">
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 dark:border-slate-800 border-t-cyan-500" />
+              <p className="text-xs font-medium text-slate-400 dark:text-slate-500 tracking-wide">
+                Generating SITREP...
+              </p>
+            </div>
+          ) : sitrepData ? (
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              {/* Scrollable Area: All cards aligned to the exact same grid */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 space-y-3.5">
+                {/* Failover Notice Card: Pixel-perfect aligned with content cards below */}
+                {sitrepData.fallbackNotice && (
+                  <div className="rounded-xl border border-amber-200/90 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/25 p-3 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200 shadow-xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="flex h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                      <span className="text-xs leading-normal">
+                        <strong className="font-bold">Failover Active:</strong> Primary Gemini quota absorbed · Routed seamlessly to <strong>{sitrepData.provider?.toUpperCase()}</strong> ({sitrepData.model})
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/25 shrink-0 whitespace-nowrap">
+                      Tier-2 Active
+                    </span>
+                  </div>
+                )}
+
+                <MarkdownContent content={sitrepData.sitrep} />
+              </div>
+            </div>
+          ) : null}
+        </Modal>
+      )}
     </div>
   );
 }
@@ -305,12 +561,17 @@ function ReadinessReport({ report }) {
       </div>
 
       <Card className="p-4">
-        <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-2">
-          Station Bunker Material Transfers & Consumption (Last 15)
-        </h3>
-        <TableWrap>
-          <table className="w-full text-left">
-            <thead>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+            Station Bunker Material Transfers & Consumption (Last 15)
+          </h3>
+          <span className="text-xs font-normal text-slate-500 font-mono">
+            {recentTransactions.slice(0, 15).length} Transactions
+          </span>
+        </div>
+        <div className="w-full max-w-full overflow-auto max-h-72 rounded-xl border border-slate-200 dark:border-slate-800">
+          <table className="w-full text-left border-collapse">
+            <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800/90 backdrop-blur-xs shadow-xs">
               <tr>
                 <Th>Timestamp</Th>
                 <Th>Type</Th>
@@ -321,7 +582,7 @@ function ReadinessReport({ report }) {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {recentTransactions.slice(0, 15).map(t => (
-                <tr key={t._id} className="text-xs">
+                <tr key={t._id} className="text-xs hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
                   <Td>{new Date(t.createdAt).toLocaleString()}</Td>
                   <Td><Pill value={t.type} /></Td>
                   <Td className="font-medium">{t.itemName} ({t.station})</Td>
@@ -329,9 +590,16 @@ function ReadinessReport({ report }) {
                   <Td className="text-slate-500">{t.performedBy?.fullName || 'Station System'}</Td>
                 </tr>
               ))}
+              {recentTransactions.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-xs text-slate-400 italic">
+                    Zero transactions logged
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-        </TableWrap>
+        </div>
       </Card>
     </div>
   );
@@ -691,17 +959,15 @@ function SarIncidentDebriefReport({ report, selectedIncidentId, onSelectIncident
         <span className="text-xs font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">
           Select Incident To Inspect / Print:
         </span>
-        <select
-          className={inputCls + ' !py-1 text-xs'}
+        <CustomSelect
           value={inc?._id || ''}
-          onChange={e => onSelectIncident(e.target.value)}
-        >
-          {incidents.map(i => (
-            <option key={i._id} value={i._id}>
-              {i.incidentCode} — {i.title} ({i.severity} · {i.status})
-            </option>
-          ))}
-        </select>
+          onChange={onSelectIncident}
+          options={incidents.map(i => ({
+            value: i._id,
+            label: `${i.incidentCode} — ${i.title} (${i.severity} · ${i.status})`
+          }))}
+          className="flex-1 min-w-[280px]"
+        />
       </div>
 
       {!inc ? (
@@ -854,6 +1120,8 @@ function SarIncidentDebriefReport({ report, selectedIncidentId, onSelectIncident
           </div>
         </div>
       )}
+
+      {/* Incident Sign-off & Close Section */}
     </div>
   );
 }

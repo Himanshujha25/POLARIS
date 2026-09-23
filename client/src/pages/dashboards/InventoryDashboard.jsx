@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Boxes, AlertTriangle, Wrench, Fuel } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useLiveRefresh } from '../../lib/useLive';
 import { Card, StatCard, Pill, Spinner, Empty, btnGhost } from '../../components/ui';
 
 export default function InventoryDashboard() {
@@ -9,15 +10,20 @@ export default function InventoryDashboard() {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const load = async () => {
+    try {
+      const [f, a] = await Promise.all([api('/api/v1/inventory/forecast'), api('/api/v1/assets')]);
+      setForecast(f); setAssets(a);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const [f, a] = await Promise.all([api('/api/v1/inventory/forecast'), api('/api/v1/assets')]);
-        setForecast(f); setAssets(a);
-      } catch { /* ignore */ }
-      setLoading(false);
-    })();
+    load();
+    const interval = setInterval(load, 8000);
+    return () => clearInterval(interval);
   }, []);
+  useLiveRefresh(load);
 
   if (loading) return <Spinner />;
   const critical = forecast.filter(f => f.status === 'CriticalDepletion' || f.status === 'Exhausted');

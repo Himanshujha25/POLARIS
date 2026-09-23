@@ -76,9 +76,12 @@ export default function Personnel() {
       if (!depForm.expeditionId && e[0]) setDepForm(f => ({ ...f, expeditionId: e[0]._id }));
       try { setUsers(await api('/api/v1/auth/users')); } catch { /* non-admin can't list */ }
     } catch { /* ignore */ }
-    setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 8000);
+    return () => clearInterval(interval);
+  }, []);
   useLiveRefresh(load);
 
   // Group by location: kitne / kahan / kaun

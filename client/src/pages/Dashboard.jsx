@@ -68,7 +68,7 @@ export default function Dashboard() {
             <Link to="/alerts" className={btnGhost + ' !px-3 !py-1 text-xs'}>Open SOS Center</Link>
           </div>
           {alerts.length === 0 && <p className="py-4 text-center text-sm text-emerald-600 dark:text-emerald-400">All clear — no unacknowledged alerts.</p>}
-          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto">
+          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto pr-1.5">
             {alerts.slice(0, 8).map(a => (
               <div key={a._id} className="rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/50">
                 <div className="flex items-center justify-between gap-2">
@@ -86,7 +86,7 @@ export default function Dashboard() {
             <h2 className="font-bold">Resupply Risk (SAFE / RISK)</h2>
             <Link to="/inventory" className={btnGhost + ' !px-3 !py-1 text-xs'}>Inventory</Link>
           </div>
-          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto">
+          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto pr-1.5">
             {[...forecast].sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 8).map(f => (
               <div key={f.id} className="rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/50">
                 <div className="flex items-center justify-between gap-2">
@@ -101,15 +101,24 @@ export default function Dashboard() {
       </div>
 
       <Card className="p-4">
-        <h2 className="mb-2 font-bold">Expeditions</h2>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="mb-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold">Expeditions</h2>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {exps.length}
+            </span>
+          </div>
+          <Link to="/expeditions" className={btnGhost + ' !px-3 !py-1 text-xs'}>View All Expeditions</Link>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 max-h-72 overflow-y-auto pr-1.5">
+          {exps.length === 0 && <p className="py-4 text-center text-sm text-slate-500 col-span-2">No expeditions found.</p>}
           {exps.map(e => (
-            <Link key={e._id} to={`/expeditions/${e._id}`} className="rounded-lg border border-slate-200 p-3 hover:border-cyan-500 dark:border-slate-700">
+            <Link key={e._id} to={`/expeditions/${e._id}`} className="rounded-lg border border-slate-200 p-3 hover:border-cyan-500 hover:bg-slate-50/50 dark:border-slate-800 dark:hover:border-cyan-500/50 dark:hover:bg-slate-800/40 transition-colors">
               <div className="flex items-center justify-between">
-                <p className="font-bold">{e.expeditionCode}</p>
+                <p className="font-bold text-sm text-slate-900 dark:text-slate-100">{e.expeditionCode}</p>
                 <Pill value={e.status} />
               </div>
-              <p className="text-sm text-slate-500">{e.title} → {e.targetStation}</p>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">{e.title} → {e.targetStation}</p>
             </Link>
           ))}
         </div>

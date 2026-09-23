@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Flame, Siren } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useLiveRefresh } from '../../lib/useLive';
 import { Card, StatCard, Pill, Spinner, Empty, btnGhost } from '../../components/ui';
 
 export default function EmergencyDashboard() {
@@ -9,15 +10,20 @@ export default function EmergencyDashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const load = async () => {
+    try {
+      const [i, a] = await Promise.all([api('/api/v1/incidents?active=true'), api('/api/v1/alerts/active')]);
+      setIncidents(i); setAlerts(a);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const [i, a] = await Promise.all([api('/api/v1/incidents?active=true'), api('/api/v1/alerts/active')]);
-        setIncidents(i); setAlerts(a);
-      } catch { /* ignore */ }
-      setLoading(false);
-    })();
+    load();
+    const interval = setInterval(load, 8000);
+    return () => clearInterval(interval);
   }, []);
+  useLiveRefresh(load);
 
   if (loading) return <Spinner />;
   const critical = incidents.filter(i => i.severity === 'Critical');

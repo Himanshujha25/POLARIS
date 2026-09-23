@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Plus, Boxes, Package, ShieldCheck, Database, ArrowRightLeft } from 'lucide-react';
+import { Plus, Boxes, Package, ShieldCheck, Database, ArrowRightLeft, Sparkles, Loader2, Copy, Check } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
 import { useAuth } from '../context/AuthContext';
-import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV } from '../components/ui';
+import { Card, Pill, Spinner, Empty, Modal, Field, TableWrap, Th, Td, inputCls, btnPrimary, btnGhost, ErrorNote, ConfirmDialog, downloadCSV, CustomSelect } from '../components/ui';
 
 const INV_CATEGORIES = [
   'Provisions',
@@ -32,6 +32,26 @@ export default function Inventory() {
   const [itemForm, setItemForm] = useState({ minimumSafeThreshold: '', criticalEmergencyThreshold: '', dailyConsumptionRate: '', storageBunker: '' });
   const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  // AI Winterover Forecast State
+  const [showAiDepletion, setShowAiDepletion] = useState(false);
+  const [aiDepletionLoading, setAiDepletionLoading] = useState(false);
+  const [aiDepletionData, setAiDepletionData] = useState(null);
+  const [copiedAi, setCopiedAi] = useState(false);
+
+  const runAIDepletion = async () => {
+    setShowAiDepletion(true);
+    setAiDepletionLoading(true);
+    setAiDepletionData(null);
+    try {
+      const res = await api('/api/v1/ai/predictive-depletion', { method: 'POST' });
+      setAiDepletionData(res);
+    } catch (err) {
+      setAiDepletionData({ prediction: 'AI forecast error: ' + err.message, provider: 'offline' });
+    } finally {
+      setAiDepletionLoading(false);
+    }
+  };
 
   // Add Item Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -204,6 +224,14 @@ export default function Inventory() {
               Add Stock Item
             </button>
           )}
+          <button
+            onClick={runAIDepletion}
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-1 text-xs font-bold text-cyan-700 hover:bg-cyan-500/20 dark:text-cyan-300 transition-all cursor-pointer shadow-xs"
+            title="Calculate winterover fuel & consumables runout risk with live generator load"
+          >
+            <Sparkles size={14} className="text-cyan-600 dark:text-cyan-400" />
+            <span>✦ AI Winterover Forecast</span>
+          </button>
           <button onClick={() => setTab('stock')} className={`${btnGhost} !px-3 !py-1 text-xs ${tab === 'stock' ? '!border-cyan-500 !text-cyan-600' : ''}`}>Stock</button>
           <button onClick={() => setTab('txns')} className={`${btnGhost} !px-3 !py-1 text-xs ${tab === 'txns' ? '!border-cyan-500 !text-cyan-600' : ''}`}>Transactions</button>
           <button onClick={exportCSV} className={btnGhost + ' !px-3 !py-1 text-xs'}>Export stock CSV</button>
@@ -280,10 +308,15 @@ export default function Inventory() {
         <Modal title="Log usage / receipt" onClose={() => setConsumeId(null)}>
           <form onSubmit={applyConsume} className="flex flex-col gap-3">
             <Field label="Mode">
-              <select className={inputCls} value={mode} onChange={e => setMode(e.target.value)}>
-                <option value="consume">Consume (usage)</option>
-                <option value="resupply">Receipt (add stock)</option>
-              </select>
+              <CustomSelect
+                className="w-full"
+                value={mode}
+                onChange={setMode}
+                options={[
+                  { value: 'consume', label: 'Consume (usage)' },
+                  { value: 'resupply', label: 'Receipt (add stock)' }
+                ]}
+              />
             </Field>
             <Field label="Amount"><input type="number" min="1" className={inputCls} value={amount} onChange={e => setAmount(e.target.value)} /></Field>
             <Field label="Reason"><input className={inputCls} value={reason} onChange={e => setReason(e.target.value)} placeholder="Daily mess consumption" /></Field>
@@ -303,10 +336,13 @@ export default function Inventory() {
         <Modal title="Transfer stock between stations" onClose={() => setShowTransfer(null)}>
           <form onSubmit={doTransfer} className="flex flex-col gap-3">
             <Field label="To station (live)">
-              <select className={inputCls} value={transfer.toStation} onChange={e => setTransfer({ ...transfer, toStation: e.target.value })}>
-                <option value="">— select —</option>
-                {(stationOptions.length ? stationOptions : ['Bharati', 'Maitri', 'Himadri']).map(s => <option key={s}>{s}</option>)}
-              </select>
+              <CustomSelect
+                className="w-full"
+                value={transfer.toStation}
+                onChange={val => setTransfer({ ...transfer, toStation: val })}
+                placeholder="— select station —"
+                options={(stationOptions.length ? stationOptions : ['Bharati', 'Maitri', 'Himadri'])}
+              />
             </Field>
             <Field label="Quantity"><input type="number" min="1" className={inputCls} value={transfer.quantity} onChange={e => setTransfer({ ...transfer, quantity: e.target.value })} /></Field>
             <Field label="Reason"><input className={inputCls} value={transfer.reason} onChange={e => setTransfer({ ...transfer, reason: e.target.value })} /></Field>
@@ -437,6 +473,46 @@ export default function Inventory() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* AI Winterover Consumables Depletion Modal */}
+      {showAiDepletion && (
+        <Modal
+          title="✦ POLARIS AI Winterover Depletion Forecast"
+          onClose={() => setShowAiDepletion(false)}
+        >
+          <div className="flex flex-col gap-3">
+            {aiDepletionLoading ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2 text-xs text-slate-500">
+                <Loader2 size={24} className="animate-spin text-cyan-600" />
+                <p>Computing polar sub-zero generator load & winterover runout curves...</p>
+              </div>
+            ) : aiDepletionData ? (
+              <div className="flex flex-col gap-2">
+                <div className="max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3.5 text-xs leading-relaxed whitespace-pre-wrap dark:border-slate-700 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
+                  {aiDepletionData.prediction}
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-[10px] text-slate-400">
+                    Model: {aiDepletionData.model || 'Polaris Heuristic v2.4'} ({aiDepletionData.provider})
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(aiDepletionData.prediction);
+                      setCopiedAi(true);
+                      setTimeout(() => setCopiedAi(false), 2000);
+                    }}
+                    className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 cursor-pointer"
+                  >
+                    {copiedAi ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    <span>{copiedAi ? 'Copied' : 'Copy Forecast'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </Modal>
       )}
 

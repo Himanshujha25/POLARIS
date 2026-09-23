@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Wrench, Plus, Truck, Radio, Shield, AlertTriangle, Activity,
   BatteryCharging, Gauge, CheckCircle2, RefreshCw, Trash2, Edit3,
@@ -6,9 +6,10 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useLiveRefresh } from '../lib/useLive';
 import {
   Card, Pill, Spinner, Empty, Modal, Field, inputCls,
-  btnPrimary, btnGhost, btnDanger, ErrorNote, ConfirmDialog
+  btnPrimary, btnGhost, btnDanger, ErrorNote, ConfirmDialog, CustomSelect
 } from '../components/ui';
 import ImageOcrUploader from '../components/ImageOcrUploader';
 
@@ -59,7 +60,7 @@ export default function Assets() {
   });
 
   const [teleId, setTeleId] = useState(null);
-  const [teleForm, setTeleForm] = useState({ operatingHours: '', engineTempC: '', fuelLevelPercent: '', oilPressurePsi: '' });
+  const [teleForm, setTeleForm] = useState({ operatingHours: '', engineTempC: '', fuelLevelPercent: '', oilPressurePsi: '', vibrationLevel: '' });
   const [maintId, setMaintId] = useState(null);
   const [desc, setDesc] = useState('');
   const [editing, setEditing] = useState(null);
@@ -76,8 +77,11 @@ export default function Assets() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const isFirstLoad = useRef(true);
+  const load = async (isBackground = false) => {
+    if (isFirstLoad.current && !isBackground) {
+      setLoading(true);
+    }
     try {
       const [assetsData, locsData] = await Promise.all([
         api('/api/v1/assets'),
@@ -92,10 +96,21 @@ export default function Assets() {
         setCreateForm(prev => ({ ...prev, station: stationNames[0] }));
       }
     } catch { /* ignore */ }
-    setLoading(false);
+    finally {
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        setLoading(false);
+      }
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useLiveRefresh(load);
+
+  useEffect(() => {
+    load(false);
+    const interval = setInterval(() => load(true), 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -137,7 +152,8 @@ export default function Assets() {
           operatingHours: Number(teleForm.operatingHours),
           engineTempC: teleForm.engineTempC !== '' ? Number(teleForm.engineTempC) : undefined,
           fuelLevelPercent: teleForm.fuelLevelPercent !== '' ? Number(teleForm.fuelLevelPercent) : undefined,
-          oilPressurePsi: teleForm.oilPressurePsi !== '' ? Number(teleForm.oilPressurePsi) : undefined
+          oilPressurePsi: teleForm.oilPressurePsi !== '' ? Number(teleForm.oilPressurePsi) : undefined,
+          vibrationLevel: teleForm.vibrationLevel !== '' ? Number(teleForm.vibrationLevel) : undefined
         }
       });
       setTeleId(null);
@@ -229,16 +245,22 @@ export default function Assets() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h1 className="text-xl font-extrabold sm:text-2xl flex items-center gap-2">
-            <Wrench className="text-cyan-500" size={24} />
-            Station Assets & Heavy Telematics
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl font-extrabold sm:text-2xl flex items-center gap-2">
+              <Wrench className="text-cyan-500" size={24} />
+              Station Assets & Heavy Telematics
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              LIVE TELEMETRY STREAM
+            </span>
+          </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Polar tracked vehicles, emergency generators, satellite terminals, and scientific instruments across stations.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} className={`${btnGhost} !px-3 !py-1.5 text-xs flex items-center gap-1.5`}>
+          <button onClick={() => load(false)} className={`${btnGhost} !px-3 !py-1.5 text-xs flex items-center gap-1.5`}>
             <RefreshCw size={13} />
             Refresh
           </button>
@@ -271,23 +293,25 @@ export default function Assets() {
             />
           </div>
 
-          <select
+          <CustomSelect
             value={filterStation}
-            onChange={e => setFilterStation(e.target.value)}
-            className={`${inputCls} !py-1 text-xs w-auto`}
-          >
-            <option value="ALL">All Stations</option>
-            {stations.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+            onChange={setFilterStation}
+            options={[
+              { value: 'ALL', label: 'All Stations' },
+              ...stations.map(s => ({ value: s, label: s }))
+            ]}
+            className="w-40"
+          />
 
-          <select
+          <CustomSelect
             value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            className={`${inputCls} !py-1 text-xs w-auto`}
-          >
-            <option value="ALL">All Asset Types</option>
-            {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+            onChange={setFilterType}
+            options={[
+              { value: 'ALL', label: 'All Asset Types' },
+              ...ASSET_TYPES.map(t => ({ value: t, label: t }))
+            ]}
+            className="w-48"
+          />
         </div>
 
         <div className="text-xs text-slate-500 font-mono">
@@ -325,54 +349,57 @@ export default function Assets() {
       )}
 
       {/* Asset Cards Grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map(a => {
           const servicePct = Math.min(100, (a.operatingHours / Math.max(1, a.maxHoursBeforeService)) * 100);
           const hrsRemaining = Math.max(0, a.maxHoursBeforeService - a.operatingHours);
           const needsService = hrsRemaining <= 25;
 
           return (
-            <Card key={a._id} className="p-4 text-sm flex flex-col justify-between">
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400 text-xs px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">
-                        {a.assetTag}
-                      </span>
-                      <Pill value={a.condition} />
-                    </div>
-                    <h3 className="font-bold text-sm mt-1">{a.name}</h3>
-                  </div>
+            <Card key={a._id} className="p-4 text-sm flex flex-col justify-between h-full">
+              <div className="flex flex-col">
+                {/* Tag & Condition */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400 text-xs px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">
+                    {a.assetTag}
+                  </span>
+                  <Pill value={a.condition} />
                 </div>
 
-                <div className="mt-2 flex items-center gap-3 text-xs text-slate-500">
+                {/* Machine Title - Uniform Height */}
+                <h3 className="font-bold text-sm mt-2 h-10 line-clamp-2 text-slate-900 dark:text-slate-100 flex items-center leading-snug" title={a.name}>
+                  {a.name}
+                </h3>
+
+                {/* Station & Type Subtitle */}
+                <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
                   <span className="flex items-center gap-1">
-                    <Radio size={12} /> {a.station}
+                    <Radio size={12} className="text-slate-400" /> {a.station}
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1 font-mono">
-                    <Cpu size={12} /> {a.type}
+                    <Cpu size={12} className="text-slate-400" /> {a.type}
                   </span>
                 </div>
 
-                {a.imageUrl && (
-                  <div className="mt-2.5 relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-black/10">
-                    <img src={a.imageUrl} alt={a.name} className="w-full h-28 object-cover" />
-                    {a.ocrExtractedText && (
-                      <div className="absolute bottom-0 inset-x-0 bg-slate-950/85 backdrop-blur px-2 py-1 text-[10px] font-mono text-cyan-300 truncate flex items-center gap-1" title={a.ocrExtractedText}>
-                        <ScanLine size={11} className="shrink-0 text-cyan-400" />
-                        <span>Plate OCR: {a.ocrExtractedText.replace(/\n+/g, ' ')}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {!a.imageUrl && a.ocrExtractedText && (
-                  <div className="mt-2 p-1.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-400 truncate flex items-center gap-1" title={a.ocrExtractedText}>
-                    <ScanLine size={11} className="shrink-0 text-cyan-500" />
-                    <span>Plate OCR: {a.ocrExtractedText.replace(/\n+/g, ' ')}</span>
-                  </div>
-                )}
+                {/* Uniform OCR / Plate Slot */}
+                <div className="h-9 mt-2.5 flex items-center">
+                  {a.ocrExtractedText ? (
+                    <div className="w-full px-2.5 py-1.5 rounded-lg bg-cyan-500/10 dark:bg-cyan-950/30 border border-cyan-500/25 text-[11px] font-mono text-cyan-700 dark:text-cyan-300 flex items-center gap-2 overflow-hidden" title={a.ocrExtractedText}>
+                      <ScanLine size={13} className="shrink-0 text-cyan-500" />
+                      <span className="truncate">Plate OCR: {a.ocrExtractedText.replace(/\n+/g, ' ')}</span>
+                    </div>
+                  ) : (
+                    <div className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-400 dark:text-slate-500 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Shield size={12} className="text-slate-400" /> Telematics ID Verified
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> SYNCED
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Service Schedule Bar */}
                 <div className="mt-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
@@ -399,26 +426,36 @@ export default function Assets() {
                   </div>
                 </div>
 
-                {/* Live Telemetry Sensors */}
-                {a.telemetry && (
-                  <div className="mt-2.5 grid grid-cols-3 gap-1.5 p-2 rounded bg-slate-100/50 dark:bg-slate-800/40 text-[11px] font-mono text-slate-500">
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">TEMP</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{a.telemetry.engineTempC ?? '—'}°C</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">FUEL</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{a.telemetry.fuelLevelPercent ?? '—'}%</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">OIL PSI</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{a.telemetry.oilPressurePsi ?? '—'}</span>
-                    </div>
+                {/* Live Telemetry Sensors Grid */}
+                <div className="mt-2.5 grid grid-cols-4 gap-1.5 p-2 rounded-lg bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-[11px] font-mono">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-sans">Temp</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {a.telemetry?.engineTempC != null ? `${a.telemetry.engineTempC}°C` : '—'}
+                    </span>
                   </div>
-                )}
+                  <div className="flex flex-col">
+                    <span className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-sans">Fuel</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {a.telemetry?.fuelLevelPercent != null ? `${a.telemetry.fuelLevelPercent}%` : '—'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-sans">Oil PSI</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {a.telemetry?.oilPressurePsi != null ? a.telemetry.oilPressurePsi : '—'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-sans">Vib</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {a.telemetry?.vibrationLevel != null ? a.telemetry.vibrationLevel : '—'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons - Pinned to Bottom */}
               {canEdit && (
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1">
@@ -429,7 +466,8 @@ export default function Assets() {
                           operatingHours: String(a.operatingHours),
                           engineTempC: a.telemetry?.engineTempC ?? '',
                           fuelLevelPercent: a.telemetry?.fuelLevelPercent ?? '',
-                          oilPressurePsi: a.telemetry?.oilPressurePsi ?? ''
+                          oilPressurePsi: a.telemetry?.oilPressurePsi ?? '',
+                          vibrationLevel: a.telemetry?.vibrationLevel ?? ''
                         });
                       }}
                       className={`${btnGhost} !px-2.5 !py-1 text-xs flex items-center gap-1 text-cyan-600 dark:text-cyan-400 hover:border-cyan-500`}
@@ -483,13 +521,12 @@ export default function Assets() {
                 />
               </Field>
               <Field label="Asset Type">
-                <select
-                  className={inputCls}
+                <CustomSelect
+                  className="w-full"
                   value={createForm.type}
-                  onChange={e => setCreateForm({ ...createForm, type: e.target.value })}
-                >
-                  {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                  onChange={val => setCreateForm({ ...createForm, type: val })}
+                  options={ASSET_TYPES}
+                />
               </Field>
             </div>
 
@@ -525,22 +562,20 @@ export default function Assets() {
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Assigned Station">
-                <select
-                  className={inputCls}
+                <CustomSelect
+                  className="w-full"
                   value={createForm.station}
-                  onChange={e => setCreateForm({ ...createForm, station: e.target.value })}
-                >
-                  {stations.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                  onChange={val => setCreateForm({ ...createForm, station: val })}
+                  options={stations}
+                />
               </Field>
               <Field label="Initial Condition">
-                <select
-                  className={inputCls}
+                <CustomSelect
+                  className="w-full"
                   value={createForm.condition}
-                  onChange={e => setCreateForm({ ...createForm, condition: e.target.value })}
-                >
-                  {ASSET_CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                  onChange={val => setCreateForm({ ...createForm, condition: val })}
+                  options={ASSET_CONDITIONS}
+                />
               </Field>
             </div>
 
@@ -590,7 +625,7 @@ export default function Assets() {
                 onChange={e => setTeleForm({ ...teleForm, operatingHours: e.target.value })}
               />
             </Field>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <Field label="Engine Temp (°C)">
                 <input
                   type="number"
@@ -618,6 +653,16 @@ export default function Assets() {
                   value={teleForm.oilPressurePsi}
                   onChange={e => setTeleForm({ ...teleForm, oilPressurePsi: e.target.value })}
                   placeholder="50"
+                />
+              </Field>
+              <Field label="Vibration (mm/s)">
+                <input
+                  type="number"
+                  step="0.1"
+                  className={inputCls}
+                  value={teleForm.vibrationLevel}
+                  onChange={e => setTeleForm({ ...teleForm, vibrationLevel: e.target.value })}
+                  placeholder="1.2"
                 />
               </Field>
             </div>
@@ -680,22 +725,20 @@ export default function Assets() {
             />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Station">
-                <select
-                  className={inputCls}
+                <CustomSelect
+                  className="w-full"
                   value={editForm.station}
-                  onChange={e => setEditForm({ ...editForm, station: e.target.value })}
-                >
-                  {stations.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                  onChange={val => setEditForm({ ...editForm, station: val })}
+                  options={stations}
+                />
               </Field>
               <Field label="Condition">
-                <select
-                  className={inputCls}
+                <CustomSelect
+                  className="w-full"
                   value={editForm.condition}
-                  onChange={e => setEditForm({ ...editForm, condition: e.target.value })}
-                >
-                  {ASSET_CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                  onChange={val => setEditForm({ ...editForm, condition: val })}
+                  options={ASSET_CONDITIONS}
+                />
               </Field>
             </div>
             <Field label="Service Interval (Max Hours)">

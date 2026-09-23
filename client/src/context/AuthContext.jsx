@@ -37,16 +37,51 @@ export function AuthProvider({ children }) {
     })();
   }, []);
 
-  // Live socket feed once logged in
+  // Live socket feed + initial DB sync once logged in
   useEffect(() => {
     if (!user) return;
     const socket = getSocket();
-    const push = (alert) => setLiveAlerts(prev => [alert, ...prev].slice(0, 20));
+
+    // 1. Initial DB sync for active alerts
+    api('/api/v1/alerts/active')
+      .then(active => {
+        if (Array.isArray(active)) {
+          setLiveAlerts(active.slice(0, 30));
+        }
+      })
+      .catch(() => {});
+
+    // 2. Real-time push when new alert or SOS is broadcast
+    const push = (alert) => {
+      setLiveAlerts(prev => {
+        const filtered = prev.filter(a => (a._id || a.id) !== (alert._id || alert.id));
+        return [alert, ...filtered].slice(0, 30);
+      });
+    };
+
+    // 3. Real-time removal when alert is acknowledged/dismissed
+    const handleAck = (data) => {
+      const targetId = data?.alertId || data?._id || data?.id;
+      if (targetId) {
+        setLiveAlerts(prev => prev.filter(a => (a._id || a.id) !== targetId));
+      }
+    };
+
+    // 4. Real-time wipe when all alerts are cleared
+    const handleClearAll = () => {
+      setLiveAlerts([]);
+    };
+
     socket.on('alert:new', push);
     socket.on('sos:broadcast', push);
+    socket.on('alert:acknowledged', handleAck);
+    socket.on('alerts:cleared', handleClearAll);
+
     return () => {
       socket.off('alert:new', push);
       socket.off('sos:broadcast', push);
+      socket.off('alert:acknowledged', handleAck);
+      socket.off('alerts:cleared', handleClearAll);
     };
   }, [user]);
 
@@ -67,10 +102,30 @@ export function AuthProvider({ children }) {
     disconnectSocket();
   };
 
-  const clearLiveAlerts = () => setLiveAlerts([]);
+  // Clear all alerts from both UI and DB in real time
+  const clearLiveAlerts = async () => {
+    setLiveAlerts([]);
+    try {
+      await api('/api/v1/alerts/clear-all', { method: 'POST' });
+    } catch (err) {
+      console.error('[alerts] clear-all error:', err);
+      const active = await api('/api/v1/alerts/active').catch(() => []);
+      if (Array.isArray(active)) setLiveAlerts(active.slice(0, 30));
+    }
+  };
+
+  // Dismiss individual alert from both UI and DB in real time
+  const dismissAlert = async (alertId) => {
+    setLiveAlerts(prev => prev.filter(a => (a._id || a.id) !== alertId));
+    try {
+      await api(`/api/v1/alerts/${alertId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.error('[alerts] dismiss error:', err);
+    }
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, liveAlerts, clearLiveAlerts }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, liveAlerts, clearLiveAlerts, dismissAlert }}>
       {children}
     </AuthContext.Provider>
   );

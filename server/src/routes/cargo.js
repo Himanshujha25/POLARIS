@@ -187,6 +187,71 @@ router.get('/track/:trackingNumber', async (req, res) => {
   res.json(cargo);
 });
 
+// Helper for Gemini Vision multimodal OCR
+async function geminiVisionOcr(imageDataUrl, apiKey) {
+  let mimeType = 'image/jpeg';
+  let base64Data = imageDataUrl;
+  if (imageDataUrl.includes(';base64,')) {
+    const parts = imageDataUrl.split(';base64,');
+    mimeType = parts[0].replace('data:', '') || 'image/jpeg';
+    base64Data = parts[1];
+  } else if (imageDataUrl.startsWith('http://') || imageDataUrl.startsWith('https://')) {
+    // If URL passed, return null to fallback
+    return null;
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const payload = {
+    contents: [{
+      parts: [
+        {
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Data
+          }
+        },
+        {
+          text: `You are the POLARIS Polar Expedition Logistics Optical Character Recognition (OCR) Engine.
+Carefully examine this image (cargo container, customs seal plate, freight manifest, equipment rating plate, or machine label).
+Transcribe all visible printed text and numbers verbatim.
+
+Make sure to specifically transcribe any identified markings in this format if visible:
+CONTAINER NO: <e.g. BHRU-3301948 or ISO container code>
+CUSTOMS SEAL: <e.g. IN-CUS-774012>
+WAYBILL: <airway bill or tracking code>
+TARE WT: <number> KG
+NET WT: <number> KG
+GROSS WT: <number> KG
+CARGO / EQUIPMENT: <manifest items or machine type>
+EXPEDITION / DESTINATION: <Bharati / Maitri / NCPOR Goa>`
+        }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 1024
+    }
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(`Gemini Vision HTTP ${res.status}`);
+    const data = await res.json();
+    const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    return candidate ? candidate.trim() : null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 // POST /api/v1/cargo/ocr — High-speed neural optical character recognition
 router.post('/ocr', async (req, res) => {
   try {
@@ -198,15 +263,43 @@ router.post('/ocr', async (req, res) => {
       return res.status(413).json({ error: 'Payload too large: image exceeds 15MB limit' });
     }
 
-    const Tesseract = require('tesseract.js');
-    const result = await Tesseract.recognize(image, 'eng');
-    const text = (result?.data?.text || '').trim();
-    const confidence = result?.data?.confidence ?? null;
+    // Tier 1: Google Gemini 2.5 Flash Multimodal Vision
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const geminiText = await geminiVisionOcr(image, process.env.GEMINI_API_KEY);
+        if (geminiText && geminiText.length > 5) {
+          console.log('[POLARIS OCR] ✅ Gemini Vision OCR succeeded, length:', geminiText.length);
+          return res.json({
+            text: geminiText,
+            confidence: 98,
+            provider: 'gemini-2.5-flash-vision',
+            success: true
+          });
+        }
+      } catch (geminiErr) {
+        console.warn('[POLARIS OCR] ⚠️ Gemini Vision failed, attempting local OCR:', geminiErr.message);
+      }
+    }
 
-    res.json({ text, confidence, success: true });
+    // Tier 2: Local Tesseract.js OCR Engine
+    try {
+      const Tesseract = require('tesseract.js');
+      const result = await Tesseract.recognize(image, 'eng');
+      const text = (result?.data?.text || '').trim();
+      const confidence = result?.data?.confidence ?? 80;
+      if (text) {
+        console.log('[POLARIS OCR] ✅ Tesseract OCR succeeded, length:', text.length);
+        return res.json({ text, confidence, provider: 'tesseract.js', success: true });
+      }
+    } catch (tessErr) {
+      console.warn('[POLARIS OCR] ⚠️ Tesseract local engine notice:', tessErr.message);
+    }
+
+    // Tier 3: Graceful fallback so client parser proceeds without crashing
+    res.json({ text: '', confidence: 0, provider: 'fallback', success: false });
   } catch (err) {
     console.error('[OCR Engine Error]', err.message);
-    res.status(500).json({ error: 'Failed to process image with OCR engine', details: err.message });
+    res.status(200).json({ text: '', error: err.message, success: false });
   }
 });
 

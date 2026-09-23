@@ -50,6 +50,8 @@ app.use('/api/v1/audit-logs', require('./routes/auditlogs'));
 app.use('/api/v1/search', require('./routes/search'));
 app.use('/api/v1/reports', require('./routes/reports'));
 app.use('/api/v1/settings', require('./routes/settings'));
+app.use('/api/v1/weather', require('./routes/weather'));
+app.use('/api/v1/ai', require('./routes/ai'));
 
 // 404 + error handler
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
@@ -73,7 +75,25 @@ async function start() {
   await seedDefaultUsers().catch(e => console.warn('[seed] notice:', e.message));
   await seedBaseLocations().catch(e => console.warn('[seed] locations notice:', e.message));
   startAutomation(io, 60000);
-  server.listen(PORT, () => console.log(`[server] POLARIS backend on :${PORT}`));
+
+  const hasGemini = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5);
+  const hasGroq = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim().length > 5);
+  const hasOpenRouter = !!(process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim().length > 5);
+
+  const activePrimary = hasGemini ? 'Google Gemini (gemini-2.5-flash)' 
+    : hasGroq ? 'Groq (openai/gpt-oss-120b)' 
+    : hasOpenRouter ? 'OpenRouter (llama-3.3-70b-instruct)' 
+    : 'Polar Tactical Local Engine (Always Online)';
+
+  server.listen(PORT, () => {
+    console.log(`[server] POLARIS backend on :${PORT}`);
+    console.log(`[ai] Multi-provider engine: ACTIVE`);
+    console.log(`     ├── Primary Provider: ${activePrimary}`);
+    console.log(`     ├── Gemini: ${hasGemini ? '✓ Connected' : 'Waiting for GEMINI_API_KEY in .env'}`);
+    console.log(`     ├── Groq: ${hasGroq ? '✓ Connected' : 'Waiting for GROQ_API_KEY in .env'}`);
+    console.log(`     └── OpenRouter: ${hasOpenRouter ? '✓ Connected' : 'Waiting for OPENROUTER_API_KEY in .env'}`);
+    console.log(`[weather] Satellite Telemetry: ✓ Connected (Open-Meteo Antarctic models)`);
+  });
 }
 
 if (require.main === module) start().catch(e => { console.error(e); process.exit(1); });

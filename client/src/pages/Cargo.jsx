@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Search, Biohazard, Printer, Box, ShieldCheck, Package, ScanLine, QrCode, ShieldAlert } from 'lucide-react';
 import { api } from '../lib/api';
 import { useLiveRefresh } from '../lib/useLive';
@@ -59,19 +59,31 @@ export default function Cargo() {
 
   const canEdit = ['SuperAdmin', 'ExpeditionManager', 'LogisticsOfficer'].includes(user?.role);
 
-  const load = async () => {
-    setLoading(true);
+  const isFirstLoad = useRef(true);
+  const load = async (isBackground = false) => {
+    if (isFirstLoad.current && !isBackground) {
+      setLoading(true);
+    }
     try {
       const [c, e] = await Promise.all([
         api(`/api/v1/cargo${statusF ? `?status=${statusF}` : ''}`),
         api('/api/v1/expeditions')
       ]);
-      setList(c); setExps(e);
-      if (!form.expeditionId && e[0]) setForm(f => ({ ...f, expeditionId: e[0]._id }));
+      setList(c || []);
+      setExps(e || []);
+      setForm(f => {
+        if (!f.expeditionId && e?.[0]) return { ...f, expeditionId: e[0]._id };
+        return f;
+      });
     } catch { /* ignore */ }
-    setLoading(false);
+    finally {
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        setLoading(false);
+      }
+    }
   };
-  useEffect(() => { load(); }, [statusF]);
+  useEffect(() => { load(false); }, [statusF]);
   useLiveRefresh(load);
 
   const generateNewTrackingNumber = (prefix = 'CRG') => {
@@ -477,28 +489,57 @@ export default function Cargo() {
               />
             </Field>
 
-            <div className="rounded-lg border border-slate-200 p-2.5 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex flex-col gap-2">
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.isHazmat}
-                  onChange={e => setForm({ ...form, isHazmat: e.target.checked })}
-                  className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                />
-                <span className="inline-flex items-center gap-1.5">
-                  <Biohazard size={14} className="text-amber-500 shrink-0" />
-                  <span>Classify as Hazardous Material (HAZMAT: Polar Fuel, Batteries, Cryogenics)</span>
-                </span>
-              </label>
+            {/* HAZMAT Classification Card */}
+            <div 
+              onClick={() => setForm(f => ({ ...f, isHazmat: !f.isHazmat }))}
+              className={`rounded-xl border p-3 cursor-pointer transition-all duration-200 ${
+                form.isHazmat 
+                  ? 'border-amber-400 bg-amber-50/80 dark:border-amber-500/40 dark:bg-amber-950/30 shadow-xs' 
+                  : 'border-slate-200 hover:border-slate-300 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+                    form.isHazmat 
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-xs' 
+                      : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'
+                  }`}>
+                    <Biohazard size={17} className={form.isHazmat ? 'animate-pulse' : ''} />
+                  </div>
+                  <div>
+                    <p className={`text-xs font-bold transition-colors ${
+                      form.isHazmat ? 'text-amber-950 dark:text-amber-300' : 'text-slate-800 dark:text-slate-200'
+                    }`}>
+                      Classify as Hazardous Material (HAZMAT)
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Polar Fuel (Jet A-1), lithium batteries, compressed gases, or cryogenics
+                    </p>
+                  </div>
+                </div>
+
+                {/* Modern Animated Toggle Switch */}
+                <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  form.isHazmat ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                }`}>
+                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    form.isHazmat ? 'translate-x-4' : 'translate-x-0'
+                  }`} />
+                </div>
+              </div>
+
               {form.isHazmat && (
-                <Field label="HAZMAT Classification / Class">
-                  <input
-                    className={inputCls}
-                    placeholder="e.g. Class 3 Flammable Liquid (HSD) or Class 9 Lithium Batteries"
-                    value={form.hazmatClass || ''}
-                    onChange={e => setForm({ ...form, hazmatClass: e.target.value })}
-                  />
-                </Field>
+                <div className="mt-3 pt-2.5 border-t border-amber-200/80 dark:border-amber-500/20" onClick={e => e.stopPropagation()}>
+                  <Field label="HAZMAT Classification / Class (UN Code)">
+                    <input
+                      className={inputCls}
+                      placeholder="e.g. Class 3 Flammable Liquid (UN 1863) or Class 9 Lithium (UN 3480)"
+                      value={form.hazmatClass || ''}
+                      onChange={e => setForm({ ...form, hazmatClass: e.target.value })}
+                    />
+                  </Field>
+                </div>
               )}
             </div>
 
@@ -508,7 +549,22 @@ export default function Cargo() {
               </div>
             )}
 
-            <button className={btnPrimary}>Register Cargo Manifest</button>
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className={btnGhost}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={`${btnPrimary} flex items-center gap-1.5`}
+              >
+                <Box size={15} />
+                <span>Register Cargo Manifest</span>
+              </button>
+            </div>
           </form>
         </Modal>
       )}
