@@ -18,22 +18,49 @@ app.use((req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   next();
 });
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
 const rawOrigins = process.env.CLIENT_ORIGIN || '';
 const parsedOrigins = rawOrigins
   ? rawOrigins.split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean)
   : [];
 
-app.use(cors({
+function isOriginAllowed(origin) {
+  // Allow non-browser requests (mobile apps, curl, server-to-server, Render health checks)
+  if (!origin) return true;
+  if (process.env.NODE_ENV !== 'production') return true;
+  if (parsedOrigins.length === 0 || parsedOrigins.includes('*')) return true;
+  if (parsedOrigins.includes(origin)) return true;
+  if (/^https?:\/\/localhost(:\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
+
+  try {
+    const { hostname } = new URL(origin);
+    // Automatically allow any Vercel and Render deployments
+    if (hostname.endsWith('.vercel.app') || hostname.endsWith('.onrender.com')) return true;
+  } catch {
+    // Malformed origin
+  }
+  return false;
+}
+
+const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || parsedOrigins.length === 0 || parsedOrigins.includes('*') || parsedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
-      callback(new Error(`CORS blocked for origin: ${origin}`));
+      console.warn(`[cors] Blocked origin: ${origin}`);
+      callback(null, false);
     }
   },
-  credentials: true
-}));
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());
@@ -87,7 +114,9 @@ app.use((err, req, res, next) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: parsedOrigins.length > 0 ? (parsedOrigins.includes('*') ? '*' : parsedOrigins) : '*',
+    origin: (origin, callback) => {
+      callback(null, isOriginAllowed(origin));
+    },
     credentials: true
   }
 });

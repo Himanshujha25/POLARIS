@@ -1,6 +1,7 @@
 import { enqueueRequest } from './offlineQueue';
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const RAW_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BASE = RAW_BASE.replace(/\/+$/, '');
 
 export function getToken() {
   return localStorage.getItem('polaris_token');
