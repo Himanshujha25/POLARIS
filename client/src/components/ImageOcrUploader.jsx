@@ -559,7 +559,7 @@ export default function ImageOcrUploader({
                 type="button"
                 onClick={() => loadDemoPreset('fuel')}
                 className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 flex items-center gap-1 transition-colors cursor-pointer"
-                title="Loads Class 3 Antarctic Aviation Jet A-1 Fuels Tank manifest"
+                title="Loads Class 3 Antarctic Aviation Jet A-1 Fuels manifest"
               >
                 <span>🛢️</span> Fuel ISO Tank Manifests
               </button>
