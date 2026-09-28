@@ -45,6 +45,16 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000 }));
 }
 
+app.get('/', (req, res) => {
+  res.json({
+    service: 'POLARIS Backend API',
+    status: 'online',
+    version: '1.0.0',
+    health: '/api/v1/health',
+    time: new Date().toISOString()
+  });
+});
+
 app.get('/api/v1/health', (req, res) => {
   res.json({ status: 'ok', service: 'polaris-backend', time: new Date().toISOString() });
 });
