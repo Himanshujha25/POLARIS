@@ -19,8 +19,19 @@ app.use((req, res, next) => {
   next();
 });
 app.use(helmet());
+const rawOrigins = process.env.CLIENT_ORIGIN || '';
+const parsedOrigins = rawOrigins
+  ? rawOrigins.split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean)
+  : [];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' && process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN : true,
+  origin: (origin, callback) => {
+    if (!origin || parsedOrigins.length === 0 || parsedOrigins.includes('*') || parsedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    }
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -62,7 +73,12 @@ app.use((err, req, res, next) => {
 });
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' } });
+const io = new Server(server, {
+  cors: {
+    origin: parsedOrigins.length > 0 ? (parsedOrigins.includes('*') ? '*' : parsedOrigins) : '*',
+    credentials: true
+  }
+});
 app.set('io', io);
 io.on('connection', (socket) => {
   socket.emit('connected', { message: 'POLARIS live feed connected' });
