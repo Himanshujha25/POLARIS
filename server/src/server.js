@@ -41,7 +41,9 @@ app.use(mongoSanitize());
 app.use(morgan('[:date[iso]] :method :url :status :response-time ms', {
   skip: (req) => req.path === '/api/v1/health'
 }));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
+if (process.env.NODE_ENV !== 'test') {
+  app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000 }));
+}
 
 app.get('/api/v1/health', (req, res) => {
   res.json({ status: 'ok', service: 'polaris-backend', time: new Date().toISOString() });

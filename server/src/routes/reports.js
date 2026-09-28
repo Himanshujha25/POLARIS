@@ -402,6 +402,7 @@ router.get('/analytics/overview', async (req, res) => {
       stationAudit,
       stationBreakdowns,
       auditModules,
+      cargo: cargos,
       expeditions: exps.map(e => ({
         _id: e._id,
         code: e.expeditionCode,

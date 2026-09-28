@@ -1,7 +1,7 @@
 # POLARIS: System Architecture & Workflow Specification
 **Platform:** POLARIS (Polar Expedition Mission Control & Logistics Platform)  
 **Problem Statement ID:** SIH26062 (Ministry of Earth Sciences / NCPOR)  
-**Document Classification:** Mission-Critical Distributed Polar Architecture Specification
+**Standard:** Enterprise Polar Expedition Management & Resilience Architecture
 
 ---
 

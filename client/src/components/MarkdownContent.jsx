@@ -171,11 +171,11 @@ export default function MarkdownContent({ content = '', className = '' }) {
           if (nonEmpty.length === 0) return null;
 
           return (
-            <div key={`header-masthead-${secIdx}`} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-[#0d1424] dark:via-[#111a2e] dark:to-[#0d1424] p-4 sm:p-5 shadow-xs">
+            <div key={`header-masthead-${secIdx}`} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111a2e] p-4 sm:p-5 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
-                    <FileText size={18} />
+                  <div className="size-8 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/40 dark:border-blue-800 flex items-center justify-center text-blue-700 dark:text-blue-300">
+                    <FileText size={18} aria-hidden="true" />
                   </div>
                   <div>
                     <h2 className="text-sm font-black tracking-wide uppercase text-slate-900 dark:text-white">
